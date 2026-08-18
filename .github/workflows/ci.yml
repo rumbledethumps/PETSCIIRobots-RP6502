@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # The converter is the safety net for the whole port: it must keep rebuilding
+  # David Murray's X16 binaries byte for byte from his published sources.
+  reference-conversion:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cc65
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cc65 python3
+      - name: Convert ACME to ca65 and compare against the shipped binaries
+        run: python3 tests/reference/verify_conversion.py
+
+  # The emulator runs headless under --script: it drives sys_run_frame() itself
+  # and never opens a window, so no X server and no xvfb. It does still link
+  # GL/X11/ALSA, so those shared libraries have to be installed.
+  rom:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools and the emulator's runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build python3 cc65 \
+            libgl1 libx11-6 libxi6 libxcursor1 libasound2t64
+
+      # tools/*.cmake and tools/rp6502.py are committed, so nothing here is
+      # needed to build. This step exists only to fetch tools/rp6502-emu, which
+      # a plain `cmake --preset` never does: rp6502_fetch_emulator() runs under
+      # RP6502_TOOLS_FETCHED, and only script mode sets that.
+      - name: Cache the emulator
+        id: emu
+        uses: actions/cache@v4
+        with:
+          path: tools/rp6502-emu
+          key: rp6502-emu-${{ runner.os }}-${{ hashFiles('tools/rp6502.cmake') }}
+
+      - name: Fetch the emulator
+        if: steps.emu.outputs.cache-hit != 'true'
+        run: cmake -P tools/rp6502.cmake
+
+      # `cmake -P` also refreshes the committed tools from picocomputer/rp6502
+      # main. Surfacing the drift is free; it should not fail the build.
+      - name: Report SDK tool drift
+        continue-on-error: true
+        run: git diff --exit-code -- tools/
