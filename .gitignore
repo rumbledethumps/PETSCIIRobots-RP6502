@@ -1,0 +1,27 @@
+# Build trees, one per CMake preset.
+/build/
+
+# Throwaway measurement scratch (see docs/size-budget.md for the results).
+/spike/
+
+# tools/ is a mix. `cmake -P tools/rp6502.cmake` fetches these and they are
+# COMMITTED, so a clone builds without network:
+#     tools/rp6502.cmake  tools/rp6502.py
+#     tools/cc65-config.cmake  tools/cc65-toolchain.cmake
+# Only the emulator binaries and the fetch's own scratch are ignored.
+/tools/rp6502-emu
+/tools/rp6502-emu.exe
+/tools/*.tmp
+/tools/SHA256SUMS
+
+# Generated assets.
+/assets/gen/
+
+# Local, per-developer.
+/.rp6502
+/CMakeUserPresets.json
+compile_commands.json
+
+# Python
+__pycache__/
+*.pyc
