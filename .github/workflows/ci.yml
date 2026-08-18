@@ -4,33 +4,84 @@ on:
   push:
   pull_request:
 
+env:
+  # The rp6502 target lives in picocomputer/cc65, not upstream cc65, and the
+  # SDK is explicit that a distribution package is not good enough. Ubuntu's
+  # cc65 assembles fine but has no rp6502 target library, so it cannot link a
+  # ROM. Build the fork once and cache it for both jobs.
+  CC65_REPO: picocomputer/cc65
+  CC65_REF: master
+
 jobs:
+  cc65:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.rev.outputs.sha }}
+    steps:
+      - name: Resolve the cc65 revision
+        id: rev
+        run: |
+          sha=$(git ls-remote https://github.com/${CC65_REPO} ${CC65_REF} | cut -f1)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the cc65 build
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/cc65-install
+          key: cc65-${{ runner.os }}-${{ steps.rev.outputs.sha }}
+
+      - name: Build cc65
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git
+          git clone --depth 1 --branch ${CC65_REF} https://github.com/${CC65_REPO} /tmp/cc65
+          make -C /tmp/cc65 -j"$(nproc)"
+          make -C /tmp/cc65 install PREFIX="$HOME/cc65-install"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cc65
+          path: ~/cc65-install
+          retention-days: 1
+
   # The converter is the safety net for the whole port: it must keep rebuilding
   # David Murray's X16 binaries byte for byte from his published sources.
   reference-conversion:
+    needs: cc65
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install cc65
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cc65 python3
+      - uses: actions/download-artifact@v4
+        with: { name: cc65, path: ~/cc65-install }
+      - run: |
+          chmod +x ~/cc65-install/bin/*
+          echo "$HOME/cc65-install/bin" >> "$GITHUB_PATH"
       - name: Convert ACME to ca65 and compare against the shipped binaries
         run: python3 tests/reference/verify_conversion.py
 
-  # The emulator runs headless under --script: it drives sys_run_frame() itself
+  # The emulator is headless under --script: it drives sys_run_frame() itself
   # and never opens a window, so no X server and no xvfb. It does still link
   # GL/X11/ALSA, so those shared libraries have to be installed.
   rom:
+    needs: cc65
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with: { name: cc65, path: ~/cc65-install }
+      - run: |
+          chmod +x ~/cc65-install/bin/*
+          echo "$HOME/cc65-install/bin" >> "$GITHUB_PATH"
+          echo "CC65_HOME=$HOME/cc65-install/share/cc65" >> "$GITHUB_ENV"
 
       - name: Install build tools and the emulator's runtime libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build python3 cc65 \
+            cmake ninja-build python3 \
             libgl1 libx11-6 libxi6 libxcursor1 libasound2t64
 
       # tools/*.cmake and tools/rp6502.py are committed, so nothing here is
