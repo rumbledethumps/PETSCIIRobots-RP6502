@@ -48,6 +48,30 @@ jobs:
         if: steps.emu.outputs.cache-hit != 'true'
         run: cmake -P tools/rp6502.cmake
 
+      - name: Build the ROM
+        run: |
+          cmake --preset cc65/Release
+          cmake --build --preset cc65/Release
+
+      # Every converted asset has to satisfy the invariants the platform layer
+      # assumes before it is allowed near the ROM.
+      - name: Verify the converted assets
+        run: python3 tests/assets/verify_assets.py
+
+      - name: Run the emulator script tests
+        run: ctest --preset cc65/Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robots.rp6502
+          path: build/cc65/release/src/robots.rp6502
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: emu-scratch
+          path: build/cc65/release/tests/emu/scratch/
+
       # `cmake -P` also refreshes the committed tools from picocomputer/rp6502
       # main. Surfacing the drift is free; it should not fail the build.
       - name: Report SDK tool drift

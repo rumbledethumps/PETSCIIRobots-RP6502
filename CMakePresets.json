@@ -1,42 +1,124 @@
 {
-    "version": 3,
-    "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
     "configurePresets": [
         {
             "name": "base",
             "hidden": true,
             "generator": "Ninja",
-            "cacheVariables": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON" }
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
         },
         {
             "name": "llvm-mos/Debug",
             "inherits": "base",
             "binaryDir": "${sourceDir}/build/llvm-mos/debug",
-            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "LLVM_MOS_PLATFORM": "rp6502" }
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "LLVM_MOS_PLATFORM": "rp6502"
+            }
         },
         {
             "name": "llvm-mos/Release",
             "inherits": "base",
             "binaryDir": "${sourceDir}/build/llvm-mos/release",
-            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "LLVM_MOS_PLATFORM": "rp6502" }
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "LLVM_MOS_PLATFORM": "rp6502"
+            }
         },
         {
             "name": "cc65/Debug",
             "inherits": "base",
             "binaryDir": "${sourceDir}/build/cc65/debug",
-            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CC65_TARGET_SYSTEM": "rp6502" }
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CC65_TARGET_SYSTEM": "rp6502"
+            }
         },
         {
             "name": "cc65/Release",
             "inherits": "base",
             "binaryDir": "${sourceDir}/build/cc65/release",
-            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "CC65_TARGET_SYSTEM": "rp6502" }
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CC65_TARGET_SYSTEM": "rp6502"
+            }
         }
     ],
     "buildPresets": [
-        { "name": "llvm-mos/Debug",   "configurePreset": "llvm-mos/Debug" },
-        { "name": "llvm-mos/Release", "configurePreset": "llvm-mos/Release" },
-        { "name": "cc65/Debug",       "configurePreset": "cc65/Debug" },
-        { "name": "cc65/Release",     "configurePreset": "cc65/Release" }
+        {
+            "name": "llvm-mos/Debug",
+            "configurePreset": "llvm-mos/Debug"
+        },
+        {
+            "name": "llvm-mos/Release",
+            "configurePreset": "llvm-mos/Release"
+        },
+        {
+            "name": "cc65/Debug",
+            "configurePreset": "cc65/Debug"
+        },
+        {
+            "name": "cc65/Release",
+            "configurePreset": "cc65/Release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "cc65/Release",
+            "inherits": "base",
+            "configurePreset": "cc65/Release"
+        },
+        {
+            "name": "cc65/Debug",
+            "inherits": "base",
+            "configurePreset": "cc65/Debug"
+        },
+        {
+            "name": "llvm-mos/Release",
+            "inherits": "base",
+            "configurePreset": "llvm-mos/Release"
+        },
+        {
+            "name": "llvm-mos/Debug",
+            "inherits": "base",
+            "configurePreset": "llvm-mos/Debug"
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "check",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "cc65/Release"
+                },
+                {
+                    "type": "build",
+                    "name": "cc65/Release"
+                },
+                {
+                    "type": "test",
+                    "name": "cc65/Release"
+                }
+            ]
+        }
     ]
 }

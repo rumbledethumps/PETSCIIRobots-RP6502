@@ -118,3 +118,31 @@ assembly path starts with 47 KB free.
 code. That new code can be written in **cc65 C and linked against the ca65 objects**, which is
 the arrangement cc65 is built for: proven game logic stays as assembly, new platform code is
 readable C, and the size budget stays comfortable either way.
+
+## M2 — video bring-up, measured on target
+
+The first ROM: three planes up, the game screen in the bitmap plane, and
+`level-a`'s map window drawn into the character plane. Built with cc65.
+
+| segment | bytes |
+|---|---|
+| `CODE` | 4,741 |
+| `RODATA` + `DATA` | 405 |
+| `BSS` | 13,872 (tileset 5,120 + level 8,704 + state) |
+| **RAM used, `$0200–$4C82`** | **19,586** of 64,768 |
+
+ROM file 226,565 bytes: the code plus 122 KB of levels, two 38,400-byte screens,
+the tileset, the font, the palettes and 14 KB of sprites — the whole game in one
+self-contained `.rp6502`.
+
+The same source also builds and passes under llvm-mos (232,669 bytes), which is
+worth keeping as a second opinion on the C.
+
+### What the on-target test proves
+
+`tests/emu/bringup.txt` checks eleven distinct tiles' character cells against
+`conv_tiles.py`'s output with `peek xram:`, so the tileset reorganisation, the
+cell address arithmetic and the portal writes are all verified on the machine
+rather than by eye. It also peeks `XR_FONT + 1` for `$7E`, which confirms the
+font really is stored row-major as mode 1 reads it — the failure that would
+otherwise show up as the VGA quietly substituting its built-in code page.

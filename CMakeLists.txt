@@ -26,4 +26,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 set(PETSCII_ASSET_DIR ${CMAKE_CURRENT_LIST_DIR}/assets CACHE PATH "Game data")
 
 if(PETSCII_TREE STREQUAL "rp6502")
+    include(Assets)
+    add_subdirectory(src)
+
+    # The emulator is a host program driven from outside, so the script suite
+    # belongs to the tree that builds the ROM it drives.
+    enable_testing()
+    add_subdirectory(tests/emu)
 endif()
