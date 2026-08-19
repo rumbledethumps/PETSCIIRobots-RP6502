@@ -96,25 +96,35 @@ that lived in the X16's machine-specific file but are pure logic:
 `CACULATE_AND_REDRAW`, `MAP_PRE_CALCULATE`, `CHECK_FOR_WINDOW_REDRAW`, and
 `DEMATERIALIZE`. `src/game/platform_bridge.s` forwards the rest to C.
 
-### The zero page remap, and the form that is easy to miss
+### Zero page belongs to the game, and the linker enforces it
 
-The file keeps two pointers in fixed low zero page, which cc65's runtime owns:
+The ported assembly names the addresses David Murray gave it -- `$02/$03` for
+the message pointer, `$04/$05` for the map pointer, `$23-$3B` for everything
+else. `src/rp6502-petscii.cfg` gives the game that range as its own memory area
+and starts cc65's runtime zero page at `$3C`:
 
-    $02/$03 -> SOURCE    the message pointer PRINT_INFO reads
-    $04/$05 -> MAP_PTR   the map pointer GET_TILE_FROM_MAP builds
+    GAMEZP:   file = "", define = yes, start = $0002, size = $003A;
+    ZP:       file = "", define = yes, start = $003C, size = $00C4;
 
-The first attempt substituted only the direct forms, `LDA $04` and `STA $04`,
-and missed the sixteen **indirect** ones, `LDA ($04),Y`. The result stores
-through `MAP_PTR` and reads through cc65's `$04`, so `GET_TILE_FROM_MAP` returns
-whatever the C runtime happened to leave there. That does not present as a bad
-address: the player simply stops walking, because the tile lookup returns a
-number whose attributes say the way is blocked. Two hours of the map, the unit
-arrays and `TILE_ATTRIB` all checking out against their source files.
+so `$04` in the ported code is `$04`, and `src/game/background_tasks.s` and
+`src/game/items.s` are the unedited conversion apart from the platform calls.
+cc65's runtime turns out to need only 26 bytes, so there is room to spare.
 
-`port_zeropage.py` now substitutes at the operand level, skips immediates
-(`#$04` is the number four), and refuses to write a file that still names low
-zero page in any addressing mode. `tests/reference/verify_conversion.py` runs
-the same check over the committed sources, so a hand-edit cannot reintroduce it.
+It was not always done this way, and the detour is worth recording. The first
+attempt translated the game's zero page onto named variables instead, and the
+substitution covered only the direct forms -- `LDA $04`, `STA $04` -- missing
+the sixteen **indirect** ones, `LDA ($04),Y`. The result stored through the new
+pointer and read through cc65's `$04`, so `GET_TILE_FROM_MAP` returned whatever
+the C runtime had left lying there.
+
+That does not present as a bad address. The player simply stops walking, because
+the tile lookup returns a number whose attributes say the way is blocked -- and
+the map, the unit arrays and `TILE_ATTRIB` all check out against their source
+files while you look for it.
+
+`globals.s` pins each address with `.assert`, so the layout is checked every
+build, and `tests/reference/verify_conversion.py` checks the partition and the
+assertions are still there. Both were verified by breaking them.
 
 ### A fixed bug
 

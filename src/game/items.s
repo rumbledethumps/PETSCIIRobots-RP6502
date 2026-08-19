@@ -1,19 +1,24 @@
 ; Items, weapons fire, search and push, from reference/x16/x16Robots.ASM lines
 ; 1468-1986 and 2032-2544.
 ;
-; Converted by tools/convert/acme2ca65.py and tools/convert/port_zeropage.py.
-; This is the half of the machine-specific file that is not actually
-; machine-specific: using an item, spawning a shot, searching a crate and
-; pushing an object are all decisions about game state. The only thing that had
-; to change is the one place where the original reached past that and wrote a
-; character into video memory itself.
+; Converted by tools/convert/acme2ca65.py. This is the half of the
+; machine-specific file that is not actually machine-specific: using an item,
+; spawning a shot, searching a crate and pushing an object are all decisions
+; about game state.
 ;
-; The other substitution is KERNAL GETIN. The original calls JSR $FFE4 to read a
-; key while a cursor is up; on the RP6502 that address is the RIA's RW0 portal,
-; so the call would pull a byte out of XRAM and advance the portal address.
-; plat_getin returns the same thing GETIN did -- the next key code, or zero --
-; and the platform layer keeps producing the codes STANDARD_CONTROLS names, so
-; every comparison in here is unchanged.
+; Two things reached past that and had to change.
+;
+; The search progress dots poked a character straight into video memory; the
+; character plane belongs to the platform layer here.
+;
+; And the two calls to KERNAL GETIN. On the RP6502 $FFE4 is the RIA's RW0
+; portal, so the call would pull a byte out of XRAM and advance the portal
+; address. plat_getin returns what GETIN returned -- the next key code, or zero
+; -- and src/input.c keeps producing the codes STANDARD_CONTROLS names, so every
+; comparison in here is unchanged.
+;
+; The zero page addresses are the original's, untranslated:
+; src/rp6502-petscii.cfg reserves $02-$3B for the game.
 
         .include "petscii.inc"
         .include "sounds.inc"
@@ -148,9 +153,9 @@ BOMB_MAGNET_COMMON1:
 
 BOMB_MAGNET_COMMON2:
 	LDA	#<MSG_BLOCKED
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_BLOCKED
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	LDA	#SFX_ERROR		;ERROR SOUND
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
@@ -208,9 +213,9 @@ EMP5:	INX
 	CPX	#28
 	BNE	EMP1
 	LDA	#<MSG_EMPUSED
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_EMPUSED
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	RTS
 
@@ -248,9 +253,9 @@ UMK3:	JSR	DISPLAY_PLAYER_HEALTH
 	LDA	#SFX_MEDKIT		;MEDKIT SOUND
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
 	LDA	#<MSG_MUCHBET
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_MUCHBET
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	RTS
 
@@ -576,9 +581,9 @@ CHS2C:	;Now check if there is an object there.
 	LDA	#0
 	STA	SEARCHBAR
 	LDA	#<MSG_SEARCHING
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_SEARCHING
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 SOBJ1:	LDA	#18	;delay time between search periods.
 	STA	BGTIMER2
@@ -610,9 +615,9 @@ SOBJ2:	JSR	BACKGROUND_TASKS
 	CMP	#255
 	BNE	SOBJ5
 CHS3:	LDA	#<MSG_NOTFOUND
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_NOTFOUND
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	RTS
 SOBJ5:	LDX	UNIT_FIND
@@ -646,9 +651,9 @@ SOBJK2:	LDA	KEYS
 	ORA	#%00000100	;Add star key
 	STA	KEYS
 SOBJ12:	LDA	#<MSG_FOUNDKEY
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDKEY
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_KEYS
 	RTS
@@ -659,9 +664,9 @@ SOBJ15:	CMP	#129	;TIME BOMB
 	ADC	INV_BOMBS
 	STA	INV_BOMBS
 	LDA	#<MSG_FOUNDBOMB
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDBOMB
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_ITEM
 	RTS
@@ -672,9 +677,9 @@ SOBJ17:	CMP	#130	;EMP
 	ADC	INV_EMP
 	STA	INV_EMP
 	LDA	#<MSG_FOUNDEMP
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDEMP
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_ITEM
 	RTS
@@ -688,9 +693,9 @@ SOBJ20:	CMP	#131	;PISTOL
 	LDA	#255	;set it to 255.
 	STA	AMMO_PISTOL
 SOBJ2A:	LDA	#<MSG_FOUNDGUN
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDGUN
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_WEAPON
 SOBJ21:	CMP	#132	;PLASMA GUN
@@ -700,9 +705,9 @@ SOBJ21:	CMP	#132	;PLASMA GUN
 	ADC	AMMO_PLASMA
 	STA	AMMO_PLASMA
 	LDA	#<MSG_FOUNDPLAS
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDPLAS
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_WEAPON
 SOBJ22:	CMP	#133	;MEDKIT
@@ -712,9 +717,9 @@ SOBJ22:	CMP	#133	;MEDKIT
 	ADC	INV_MEDKIT
 	STA	INV_MEDKIT
 	LDA	#<MSG_FOUNDMED
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDMED
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_ITEM
 SOBJ23:	CMP	#134	;MAGNET
@@ -724,9 +729,9 @@ SOBJ23:	CMP	#134	;MAGNET
 	ADC	INV_MAGNET
 	STA	INV_MAGNET
 	LDA	#<MSG_FOUNDMAG
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_FOUNDMAG
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	DISPLAY_ITEM
 SOBJ99:	;ADD CODE HERE FOR OTHER OBJECT TYPES
@@ -874,9 +879,9 @@ MV10:	LDA	#0
 	CMP	#%00000100
 	BEQ	MV11
 	LDA	#<MSG_CANTMOVE
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_CANTMOVE
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	LDA	#SFX_ERROR		;ERROR SOUND
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
@@ -1006,9 +1011,9 @@ MV30:	;Now scan for any units at that location:
 	CMP	#255			;255 means no unit found.
 	BEQ	MV31
 MV3A:	LDA	#<MSG_BLOCKED
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_BLOCKED
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	LDA	#SFX_ERROR		;ERROR SOUND
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
@@ -1016,10 +1021,10 @@ MV3A:	LDA	#<MSG_BLOCKED
 MV31:	LDA	#SFX_MOVE		;move sound
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
 	LDY	#0
-	LDA	(MAP_PTR),Y			;Grab current object
+	LDA	($04),Y			;Grab current object
 	STA	MOVTEMP_D
 	LDA	MOVTEMP_O
-	STA	(MAP_PTR),Y			;replace with obect we are moving
+	STA	($04),Y			;replace with obect we are moving
 	LDA	MOVTEMP_X		;RETRIEVE original location of object
 	STA	MAP_X
 	LDA	MOVTEMP_Y
@@ -1029,7 +1034,7 @@ MV31:	LDA	#SFX_MOVE		;move sound
 	CMP	#148		;trash compactor tile
 	BNE	MV31A
 	LDA	#09		;Floor tile
-MV31A:	STA	(MAP_PTR),Y			;Replace former location
+MV31A:	STA	($04),Y			;Replace former location
 	LDA	#1
 	STA	REDRAW_WINDOW		;See the result
 	LDA	MOVTEMP_U

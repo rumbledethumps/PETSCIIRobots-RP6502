@@ -78,38 +78,46 @@ def build(name: str, work: pathlib.Path) -> bytes:
     return binf.read_bytes()
 
 
-def check_no_raw_zeropage() -> int:
-    """No file under src/game/ may name low zero page by number.
+def check_zeropage_is_partitioned() -> int:
+    """The linker must keep reserving the game's zero page.
 
-    cc65's runtime owns $00-$1F, so the ported sources use MAP_PTR and SOURCE
-    instead. Getting this wrong is quiet: a routine that stores through the new
-    pointer and reads through the old one looks like corrupt map data, not a bad
-    address, and the indirect form -- LDA ($04),Y -- is the one that is easy to
-    miss because it does not look like the direct form.
+    The ported assembly names the addresses David Murray gave it -- $02-$05 for
+    its two pointers, $23-$3B for the rest -- so those addresses have to belong
+    to the game and not to cc65's runtime. src/rp6502-petscii.cfg does that with
+    a separate memory area, and src/game/globals.s asserts at assembly time that
+    each variable landed where the original put it.
+
+    Both halves matter, and either can be deleted without anything obviously
+    breaking until a routine starts reading the wrong byte, so check both are
+    still there. The addresses themselves are checked by the build.
     """
     bad = []
-    # Only instruction operands. A .byte line full of screen codes is data --
-    # $0D there is the letter M, not an address -- so flagging that would make
-    # this check noise rather than a guard.
-    ops = ("lda|sta|ldx|stx|ldy|sty|cmp|cpx|cpy|adc|sbc|and|ora|eor|bit"
-           "|asl|lsr|rol|ror|inc|dec|jmp|jsr|stz|trb|tsb")
-    pat = re.compile(r"\b(?:" + ops + r")\s+\(?\$0[0-9A-Fa-f](?![0-9A-Fa-f])",
-                     re.IGNORECASE)
-    for path in sorted((ROOT / "src" / "game").glob("*.s")):
-        for n, line in enumerate(path.read_text().splitlines(), 1):
-            code = line.split(";", 1)[0]
-            if pat.search(code):
-                bad.append(f"  {path.name}:{n}: {code.strip()}")
+    cfg = (ROOT / "src" / "rp6502-petscii.cfg").read_text()
+    if "GAMEZP:" not in cfg or "GAMEZEROPAGE:" not in cfg:
+        bad.append("  rp6502-petscii.cfg no longer reserves a zero page area "
+                   "for the game")
+    if not re.search(r'start\s*=\s*\$0002', cfg):
+        bad.append("  the game's zero page area does not start at $02")
+
+    globals_s = (ROOT / "src" / "game" / "globals.s").read_text()
+    if '.segment "GAMEZEROPAGE"' not in globals_s:
+        bad.append("  globals.s does not put the game's variables in GAMEZEROPAGE")
+    asserts = len(re.findall(r'^\s*\.assert\s+\w+\s*=\s*\$[0-9A-Fa-f]{2},', 
+                             globals_s, re.M))
+    if asserts < 8:
+        bad.append(f"  globals.s pins only {asserts} zero page addresses; "
+                   "the layout is load-bearing")
+
     if bad:
-        print("src/game references low zero page by number:")
+        print("zero page is no longer partitioned:")
         print("\n".join(bad))
         return 1
-    print("  src/game            no raw low zero page")
+    print(f"  zero page          partitioned, {asserts} addresses pinned")
     return 0
 
 
 def main() -> int:
-    failures = check_no_raw_zeropage()
+    failures = check_zeropage_is_partitioned()
     for name in PROGRAMS:
         ref_prg = PRG_DIR.get(name, ASSETS) / f"{name}.PRG"
         if not ref_prg.exists():

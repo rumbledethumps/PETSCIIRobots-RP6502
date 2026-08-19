@@ -18,7 +18,9 @@ extern unsigned char UNIT;         /* which unit a routine acts on         */
 extern unsigned char MOVE_TYPE;    /* MOVE_WALK, MOVE_HOVER, or both       */
 extern unsigned char MOVE_RESULT;  /* 1 if the move happened               */
 extern unsigned char UNIT_FIND;    /* 255 if no unit was there             */
-extern unsigned char RANDOM;       /* LFSR state; seed it non-zero         */
+extern unsigned char RANDOM;       /* LFSR state; seed it non-zero. Not zero
+                                    * page: the original keeps it as a plain
+                                    * byte, and so does this.              */
 
 /* These really are in zero page, and saying so is worth a byte and a cycle at
  * every access. Without it cc65 emits absolute addressing and ld65 warns about
@@ -30,7 +32,6 @@ extern unsigned char RANDOM;       /* LFSR state; seed it non-zero         */
 #pragma zpsym("MOVE_TYPE")
 #pragma zpsym("MOVE_RESULT")
 #pragma zpsym("UNIT_FIND")
-#pragma zpsym("RANDOM")
 
 /* The message pointer PRINT_INFO reads. Two zero page bytes, so it is a real
  * pointer here rather than a pair of bytes. */

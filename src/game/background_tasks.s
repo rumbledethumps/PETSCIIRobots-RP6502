@@ -1,26 +1,20 @@
 ; Unit AI and the background task loop.
 ;
 ; Converted from reference/x16/BACKGROUND_TASKS.ASM by
-; tools/convert/acme2ca65.py and tools/convert/port_zeropage.py -- the file
-; David Murray shared across the C64, PET, VIC-20 and X16 ports, and the most
-; machine-independent part of the game. These are his instructions; the only
-; change is the zero page remap, forced by cc65 owning low zero page:
+; tools/convert/acme2ca65.py -- the file David Murray shared across the C64,
+; PET, VIC-20 and X16 ports, and the most machine-independent part of the game.
 ;
-;   $02/$03 -> SOURCE    the message pointer PRINT_INFO reads
-;   $04/$05 -> MAP_PTR   the map pointer GET_TILE_FROM_MAP builds
-;
-; Note that the remap has to cover indirect addressing -- LDA ($04),Y -- and not
-; just the direct form. Missing it produces code that stores through the new
-; pointer and reads through the old one, which looks like corrupt map data
-; rather than a bad address. port_zeropage.py checks that nothing references low
-; zero page by number afterwards, in any addressing mode.
+; It is his instructions, unedited. The zero page addresses it names are the
+; ones it always named: src/rp6502-petscii.cfg reserves $02-$3B for the game and
+; starts cc65's own zero page above it, so $04 here is $04 and there is nothing
+; to translate. An earlier attempt did translate it, missed the indirect form --
+; LDA ($04),Y -- and produced code that stored through one pointer and read
+; through another. Letting the linker partition zero page removes the whole
+; class of mistake.
 ;
 ; Everything the file calls that is not in here is declared in petscii.inc:
 ; game state in globals.s, and the presentation entry points in
 ; platform_bridge.s, which forwards them to C.
-;
-; The per-frame timers this consumes are maintained by the VSYNC interrupt in
-; irq.s, exactly as they were by the X16's VBLANK handler.
 
         .include "petscii.inc"
         .include "sounds.inc"
@@ -596,9 +590,9 @@ TRANS_PLAYER_PRESENT:
 	CMP	#0	;unit active
 	BEQ	TRPL1
 	LDA	#<MSG_TRANS1
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_TRANS1
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	LDA	#SFX_ERROR		;error-SOUND
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
@@ -879,7 +873,7 @@ BEX_PART2:
 BEX_PART3:
 	LDA	#246
 	LDY	#0
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 BEXCEN:	JSR	CHECK_FOR_UNIT
 	LDA	UNIT_FIND
 	CMP	#255
@@ -894,7 +888,7 @@ BIG_EXP_PHASE2:
 	JSR	BEX_PART1
 	JSR	GET_TILE_FROM_MAP
 	LDA	#246
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	LDA	TILE
 	STA	TEMP_A
 	JSR	RESTORE_TILE
@@ -1019,16 +1013,16 @@ REST0:	LDY	TEMP_A
 	BNE	REST2
 	LDA	DESTRUCT_PATH,Y
 	LDY	#0
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	RTS
 REST2:	LDA	TEMP_A
 	LDY	#0
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	RTS
 REST3:	;What to do if we encounter an explosive cannister
 	LDA	#135	;Blown cannister
 	LDY	#0
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	LDX	#28	;Start of weapons units
 REST4:	LDA	UNIT_TYPE,X
 	CMP	#0
@@ -1077,7 +1071,7 @@ TC_OPEN_STATE:
 	CMP	#148	;Usual tile for trash compactor danger zone
 	BNE	TRS15
 TRS10:	INY
-	LDA	(MAP_PTR),Y
+	LDA	($04),Y
 	CMP	#148	;Usual tile for trash compactor danger zone
 	BNE	TRS15
 	LDA	#23
@@ -1139,9 +1133,9 @@ TC_MID_CLOSING:
 	JMP	AILP
 TCMC1:	;Found unit in compactor, kill it.
 	LDA	#<MSG_TERMINATED
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_TERMINATED
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	LDA	#SFX_EXPLOSION	;EXPLOSION sound
 	JSR	PLAY_DIGI_SOUND	;SOUND PLAY
@@ -1219,16 +1213,16 @@ DRAW_TRASH_COMPACTOR:
 	JSR	PLOT_TILE_TO_MAP
 	INY
 	LDA	TCPIECE2
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	TYA
 	CLC
 	ADC	#127
 	TAY
 	LDA	TCPIECE3
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	LDA	TCPIECE4
 	INY
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	JSR	CHECK_FOR_WINDOW_REDRAW
 	RTS
 TCPIECE1:	.byte 00
@@ -1346,7 +1340,7 @@ PAIC02:	DEC	UNIT_A,X	;reduce range by one
 	;hit an explosive cannister
 	LDA	#135	;Blown cannister
 	LDY	#0
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	LDX	UNIT
 	LDA	#6	;bomb AI
 	STA	UNIT_TYPE,X
@@ -1904,24 +1898,24 @@ DRAW_VERTICAL_DOOR:
 	LDA	DOORPIECE1
 	STA	TILE
 	JSR	PLOT_TILE_TO_MAP
-	LDA	MAP_PTR
+	LDA	$04
 	CLC
 	ADC	#128
-	STA	MAP_PTR
-	LDA	MAP_PTR+1
+	STA	$04
+	LDA	$05
 	ADC	#$00
-	STA	MAP_PTR+1
+	STA	$05
 	LDA	DOORPIECE2
-	STA	(MAP_PTR),Y
-	LDA	MAP_PTR
+	STA	($04),Y
+	LDA	$04
 	CLC
 	ADC	#128
-	STA	MAP_PTR
-	LDA	MAP_PTR+1
+	STA	$04
+	LDA	$05
 	ADC	#$00
-	STA	MAP_PTR+1
+	STA	$05
 	LDA	DOORPIECE3
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	RTS
 
 DRAW_HORIZONTAL_DOOR:
@@ -1935,10 +1929,10 @@ DRAW_HORIZONTAL_DOOR:
 	JSR	PLOT_TILE_TO_MAP
 	INY
 	LDA	DOORPIECE2
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	INY
 	LDA	DOORPIECE3
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	RTS
 DOORPIECE1:	.byte 00
 DOORPIECE2:	.byte 00
@@ -2189,14 +2183,14 @@ ELPN1:	LDA	UNIT_LOC_Y,X	;elevator Y location
 	RTS
 ELPN2:	;PLAYER DETECTED, START ELEVATOR PANEL
 	LDA	#<MSG_ELEVATOR
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_ELEVATOR
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	LDA	#<MSG_LEVELS
-	STA	SOURCE
+	STA	$02
 	LDA	#>MSG_LEVELS
-	STA	SOURCE+1
+	STA	$03
 	JSR	PRINT_INFO
 	JSR	ELEVATOR_SELECT
 	RTS
@@ -2209,14 +2203,14 @@ PLOT_TILE_TO_MAP:
 	PHP
 	CLC
 	ADC	#>MAP
-	STA	MAP_PTR+1	;HIGH BYTE OF MAP SOURCE
+	STA	$05	;HIGH BYTE OF MAP SOURCE
 	LDA	#$0
 	PLP
 	ROR
 	ORA	MAP_X
-	STA	MAP_PTR	;LOW BYTE OF MAP SOURCE
+	STA	$04	;LOW BYTE OF MAP SOURCE
 	LDA	TILE
-	STA	(MAP_PTR),Y
+	STA	($04),Y
 	RTS
 
 ;This routine will return the tile for a specific X/Y
@@ -2230,13 +2224,13 @@ GET_TILE_FROM_MAP:
 	PHP
 	CLC
 	ADC	#>MAP
-	STA	MAP_PTR+1	;HIGH BYTE OF MAP SOURCE
+	STA	$05	;HIGH BYTE OF MAP SOURCE
 	LDA	#$0
 	PLP
 	ROR
 	ORA	MAP_X
-	STA	MAP_PTR	;LOW BYTE OF MAP SOURCE
-	LDA	(MAP_PTR),Y
+	STA	$04	;LOW BYTE OF MAP SOURCE
+	LDA	($04),Y
 	STA	TILE
 	RTS
 

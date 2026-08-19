@@ -13,31 +13,56 @@
         .include "petscii.inc"
 
 ; ---- zero page ----------------------------------------------------------
-        .segment "ZEROPAGE"
+;
+; At the addresses David Murray gave them. src/rp6502-petscii.cfg reserves
+; $02-$3B for the game and starts cc65's own zero page at $3C, so there is
+; nothing to translate and nothing to collide with -- the ported assembly says
+; $04 and means $04.
+;
+; The order below is the original's, gap and all, and the assertions at the end
+; check it landed where it should. Getting this wrong used to be silent: a
+; routine storing through one address and reading through another looks like
+; corrupt map data rather than a bad pointer.
 
-TILE:           .res 1          ; the tile number being plotted or fetched
-MAP_X:          .res 1          ; map coordinates, 0..127 and 0..63
-MAP_Y:          .res 1
-UNIT:           .res 1          ; the unit being processed
-MOVE_TYPE:      .res 1          ; MOVE_WALK or MOVE_HOVER
-MOVE_RESULT:    .res 1          ; 1 = the move happened
-UNIT_FIND:      .res 1          ; 255 = no unit present
-RANDOM:         .res 1          ; 8-bit LFSR state
-MAP_PTR:        .res 2          ; was the X16's hardcoded $04/$05
-SOURCE:         .res 2          ; was the X16's hardcoded $02/$03: message pointer
-TEMP_A:         .res 1          ; scratch, shared by several routines
-TEMP_B:         .res 1
-TEMP_C:         .res 1
-TEMP_D:         .res 1
-MAP_WINDOW_X:   .res 1          ; top-left of the visible map window
-MAP_WINDOW_Y:   .res 1
-REDRAW_WINDOW:  .res 1          ; 1 = the window needs redrawing
-SCREEN_SHAKE:   .res 1          ; 1 = shake the character plane
-SSCOUNT:        .res 1          ; shake phase, 0..4
-PRECALC_COUNT:  .res 1          ; index into MAP_PRECALC while drawing
-CURSOR_X:       .res 1          ; selection cursor, in map window cells
-CURSOR_Y:       .res 1
-CURSOR_ON:      .res 1          ; 0 off, 1 compass, 2 magnifier, 3 hand
+        .segment "GAMEZEROPAGE": zeropage
+
+SOURCE:         .res 2          ; $02  message pointer, for PRINT_INFO
+MAP_PTR:        .res 2          ; $04  map pointer, built by GET_TILE_FROM_MAP
+                .res 29         ; $06-$22 the original leaves alone
+TILE:           .res 1          ; $23  the tile being plotted or fetched
+TEMP_X:         .res 1          ; $24  loop counters for the viewport draw
+TEMP_Y:         .res 1          ; $25
+MAP_X:          .res 1          ; $26  map coordinates, 0..127 and 0..63
+MAP_Y:          .res 1          ; $27
+MAP_WINDOW_X:   .res 1          ; $28  top-left of the visible map window
+MAP_WINDOW_Y:   .res 1          ; $29
+DECNUM:         .res 1          ; $2A  a value to print as three digits
+ATTRIB:         .res 1          ; $2B
+UNIT:           .res 1          ; $2C  the unit being processed
+TEMP_A:         .res 1          ; $2D  scratch, shared by several routines
+TEMP_B:         .res 1          ; $2E
+TEMP_C:         .res 1          ; $2F
+TEMP_D:         .res 1          ; $30
+CURSOR_X:       .res 1          ; $31  selection cursor, in map window cells
+CURSOR_Y:       .res 1          ; $32
+CURSOR_ON:      .res 1          ; $33  0 off, 1 compass, 2 magnifier, 3 hand
+REDRAW_WINDOW:  .res 1          ; $34  1 = the window needs redrawing
+MOVE_RESULT:    .res 1          ; $35  1 = the move happened
+UNIT_FIND:      .res 1          ; $36  255 = no unit present
+MOVE_TYPE:      .res 1          ; $37  MOVE_WALK or MOVE_HOVER
+SCREEN_SHAKE:   .res 1          ; $38  1 = shake the character plane
+PRECALC_COUNT:  .res 1          ; $39  index into MAP_PRECALC while drawing
+CUR_PATTERN:    .res 2          ; $3A  the music pattern being played
+
+; The layout is load-bearing, so prove it rather than trusting the order above.
+        .assert SOURCE        = $02, error, "SOURCE moved"
+        .assert MAP_PTR       = $04, error, "MAP_PTR moved"
+        .assert TILE          = $23, error, "TILE moved"
+        .assert MAP_X         = $26, error, "MAP_X moved"
+        .assert UNIT          = $2C, error, "UNIT moved"
+        .assert CURSOR_X      = $31, error, "CURSOR_X moved"
+        .assert MOVE_TYPE     = $37, error, "MOVE_TYPE moved"
+        .assert CUR_PATTERN   = $3A, error, "CUR_PATTERN moved"
 
 ; ---- level data ---------------------------------------------------------
         .segment "LEVELDATA"
@@ -87,7 +112,9 @@ SECONDS:        .res 1
 MINUTES:        .res 1
 HOURS:          .res 1
 
-BGTIMER1:       .res 1          ; set once a frame, cleared by BACKGROUND_TASKS
+RANDOM:         .res 1          ; 8-bit LFSR state; seed it non-zero
+SSCOUNT:        .res 1          ; screen shake phase, 0..4
+BGTIMER1:       .res 1          ; set once a tick, cleared by BACKGROUND_TASKS
 BGTIMER2:       .res 1          ; counts down to zero and stays there
 BIG_EXP_ACT:    .res 1          ; only one big explosion may run at a time
 MAGNET_ACT:     .res 1

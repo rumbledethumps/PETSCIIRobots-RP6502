@@ -8,7 +8,8 @@
         .include "petscii.inc"
 
         .exportzp _TILE, _MAP_X, _MAP_Y, _UNIT, _MOVE_TYPE
-        .exportzp _MOVE_RESULT, _UNIT_FIND, _RANDOM
+        .exportzp _MOVE_RESULT, _UNIT_FIND
+        .export _RANDOM, _SSCOUNT
 _TILE           := TILE
 _MAP_X          := MAP_X
 _MAP_Y          := MAP_Y
@@ -17,6 +18,7 @@ _MOVE_TYPE      := MOVE_TYPE
 _MOVE_RESULT    := MOVE_RESULT
 _UNIT_FIND      := UNIT_FIND
 _RANDOM         := RANDOM
+_SSCOUNT        := SSCOUNT
 
         .export _UNIT_TYPE, _UNIT_LOC_X, _UNIT_LOC_Y
         .export _UNIT_A, _UNIT_B, _UNIT_C, _UNIT_D, _UNIT_HEALTH, _MAP

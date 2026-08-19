@@ -13,7 +13,9 @@ PETSCII_INC = 1
 ; that matters is MAP_PTR: the original hardcodes $04/$05 as its map pointer,
 ; which belongs to the C runtime here.
         .globalzp TILE, MAP_X, MAP_Y, UNIT, MOVE_TYPE, MOVE_RESULT
-        .globalzp UNIT_FIND, MAP_PTR, RANDOM
+        .globalzp UNIT_FIND, MAP_PTR, SOURCE, CUR_PATTERN
+        .globalzp TEMP_X, TEMP_Y, DECNUM, ATTRIB
+        .global RANDOM, SSCOUNT
 
 ; ---- level data ---------------------------------------------------------
         .global UNIT_TYPE, UNIT_LOC_X, UNIT_LOC_Y
@@ -24,9 +26,8 @@ PETSCII_INC = 1
         .global DESTRUCT_PATH, TILE_ATTRIB
 
 ; ---- more game state ----------------------------------------------------
-        .globalzp SOURCE, TEMP_A, TEMP_B, TEMP_C, TEMP_D
+        .globalzp TEMP_A, TEMP_B, TEMP_C, TEMP_D
         .globalzp MAP_WINDOW_X, MAP_WINDOW_Y, REDRAW_WINDOW, SCREEN_SHAKE
-        .globalzp SSCOUNT
         .globalzp PRECALC_COUNT
         .global UNIT_TIMER_A, UNIT_TIMER_B, UNIT_TILE, EXP_BUFFER, MAP_PRECALC
         .global BGTIMER1, BGTIMER2, BIG_EXP_ACT, MAGNET_ACT, PLASMA_ACT
