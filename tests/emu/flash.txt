@@ -1,0 +1,168 @@
+# The border flash, in real play.
+#
+# INFLICT_DAMAGE sets BORDER to 10 when the unit it hurts is the player, and the
+# interrupt walks the ramp down from there, tinting entry 0 of the bitmap
+# palette -- the black the playfield sits on. Nothing else in the suite reaches
+# it: the player takes no damage anywhere a script can get to in level-a.
+#
+# level-e has a hazard at 75,42 that hurts him once a second or so, which makes
+# a repeatable trigger. Getting there is 25 squares through a level with doors
+# in the way, so the route below was recorded by tools/playthrough.py, which
+# drives the emulator a step at a time and re-plans from where the player
+# actually is. Replayed open loop it is deterministic under --seed 1.
+#
+# Regenerate with:  tools/playthrough.py e 75 42
+wait "MENU"
+run 30
+press k
+run 6
+release k
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press i
+run 6
+release i
+run 10
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 20
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press i
+run 8
+release i
+run 8
+press l
+run 8
+release l
+run 8
+press i
+run 8
+release i
+run 8
+
+# On the hazard, untouched.
+peek xram:$FE04 $4B $2A
+peek xram:$FE06 $0C
+
+# One hit: health down one, and entry 0 part way up the red ramp. The ramp is
+# 8, 15, 25, 31 and back, in the five bits RGB555 gives red -- the X16 saw 8,
+# 15, 9, 15 because VERA reads only four of them.
+run 12
+peek xram:$FE06 $0B
+peek xram:$E000 $39 $00
+
+# Still being hit, and at the top of the ramp.
+run 36
+peek xram:$FE06 $07
+peek xram:$E000 $3F $00
+
+# The hazard stops and entry 0 goes back to opaque black -- the opacity bit set,
+# every colour component zero. Leaving it tinted would darken or stain the whole
+# playfield for the rest of the game.
+run 24
+peek xram:$FE06 $06
+peek xram:$E000 $20 $00

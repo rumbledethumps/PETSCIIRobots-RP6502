@@ -338,6 +338,27 @@ the map rather than drawn over it. Level-g starts with a robot already in view,
 so it reaches the path on the first frame -- and getting there drives the intro
 menu's map option, which nothing else did either.
 
+## Driving the game further than a fixed list of keys can reach
+
+`tests/emu` scripts are open loop: press keys, check results, with no way to ask
+where the player ended up and decide what to press next. That is fine for a few
+steps and useless for crossing a level -- a door costs one press to open before
+it costs one to walk through, and a robot in the way costs an unknown number, so
+a fixed list desynchronises and every move after that is wrong. Two attempts at
+hand-written routes into level-l and level-g died exactly there.
+
+`rp6502-emu` takes `--script -`, so `tools/playthrough.py` drives it a line at a
+time: read the player's position out of the probe block, plan a route from
+*there* with a breadth-first search over the level's walkability, press one key,
+look again. Walkability is `TILE_ATTRIB` bit 0, the same bit `REQUEST_WALK` tests
+through `MOVE_TYPE`; door squares count as passable because walking into one
+opens it, and the extra press that costs is what the loop absorbs.
+
+What it prints is the script that worked. Replayed open loop that is
+deterministic under a fixed seed, so a recorded route is a normal test until the
+game's timing changes -- and when it does, regenerating is one command rather
+than an afternoon. `tests/emu/flash.txt` is the first test built this way.
+
 ## The border and background flashes
 
 `BORDER` and `BGFLASH` are each one array whose index 0 is a countdown and whose
@@ -356,10 +377,14 @@ written. The green and blue nibbles are doubled to fill five bits.
 Verified by forcing both counters at bring-up and reading the palette entry every
 frame: red ramps 0, 8, 15, 25, 31, 31, 25, 15, 8, 0 with blue and green
 alongside, the opacity bit stays set throughout, and entry 0 returns to opaque
-black on the way out. **Not covered by a shipped test**: the triggers are
-`USE_EMP`, the trash compactor reaching the player, and the player taking damage,
-and nothing in level-a's start area reaches any of them from a script. Same gap
-as the unit overlay above.
+black on the way out.
+
+`tests/emu/flash.txt` then covers it in real play. The triggers are `USE_EMP`,
+the trash compactor reaching the player, and the player taking damage, and
+nothing in level-a's start area reaches any of them -- but level-e has a hazard
+at 75,42 that hurts the player about once a second, which is a repeatable
+trigger. Getting there is 25 squares through doors, which is what
+`tools/playthrough.py` is for.
 
 ## Sound: the engine the X16 threw away
 
