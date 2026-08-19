@@ -251,3 +251,18 @@ robots, and winning needs the transporter at 74,45 -- 59 tiles away, and it only
 activates once every robot is dead. Both endings were checked with a throwaway
 build that forced the transition; the screens are right, but until there is a
 way to script a death cheaply this is the one path CI does not cover.
+
+## The elevator panel
+
+`plat_elevator_select` draws the floor numbers along the bottom row, highlights
+the one the player is on, and moves him when left or right picks another. The
+window offsets look inconsistent -- `x - 5` but `y - 4` -- and are not: the
+original decrements the player's Y after reading it, so he ends up one square
+above the elevator and the window four above that, which is the same viewport
+row 3 every other move puts him on.
+
+**This one is untested.** It compiles and reads correctly against the original,
+but no level puts an elevator somewhere a script can reach cheaply. The nearest
+is level-k's, eight tiles from the start, and the route runs around a bunker and
+through a corridor where a robot stands in the way. Worth coming back to with a
+scripted path, or a test hook that places the player.

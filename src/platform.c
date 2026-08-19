@@ -751,7 +751,95 @@ void __fastcall__ plat_play_sound(unsigned char effect)
     (void)effect;               /* M7: the PET music engine on the RIA PSG */
 }
 
-void plat_elevator_select(void) { }          /* M6: the elevator UI      */
+/* The elevator panel. The AI has already printed the two message lines; this
+ * draws the floor numbers along the bottom row, highlights the one the player
+ * is on, and lets left and right pick another.
+ *
+ * Choosing a floor moves the player immediately -- there is no travel -- by
+ * finding the elevator unit whose UNIT_C matches, which is what
+ * ELEVATOR_FIND_XY does. The window offsets look inconsistent at a glance:
+ * x - 5 but y - 4. They are not. The original decrements the player's Y after
+ * reading it, so the player ends up one square above the elevator and the
+ * window four above that, which is the same viewport row 3 every other move
+ * puts him on.
+ */
+#define ELEV_ROW      29
+#define ELEV_COL      7
+#define ELEV_NORMAL   0x05      /* green on transparent */
+#define ELEV_SELECTED 0x50      /* inverted */
+
+static unsigned char elevator_max, elevator_floor;
+
+static void elevator_invert(unsigned char color)
+{
+    RIA.addr0 = CELL(ELEV_COL + elevator_floor - 1, ELEV_ROW) + 1;
+    RIA.step0 = 1;
+    RIA.rw0 = color;
+}
+
+/* Put the player on the chosen floor. */
+static void elevator_find_xy(void)
+{
+    unsigned char i;
+    for (i = 32; i < 48; i++) {
+        if (UNIT_TYPE[i] != 19 || UNIT_C[i] != elevator_floor)
+            continue;
+        UNIT_LOC_X[0] = UNIT_LOC_X[i];
+        MAP_WINDOW_X = (unsigned char)(UNIT_LOC_X[i] - 5);
+        UNIT_LOC_Y[0] = (unsigned char)(UNIT_LOC_Y[i] - 1);
+        MAP_WINDOW_Y = (unsigned char)(UNIT_LOC_Y[i] - 4);
+        plat_draw_map_window();
+        plat_play_sound(SFX_BEEP2);
+        return;
+    }
+}
+
+void plat_elevator_select(void)
+{
+    unsigned char i, key;
+
+    plat_draw_map_window();
+    elevator_max = UNIT_D[UNIT];
+    elevator_floor = UNIT_C[UNIT];
+
+    /* The floors, as digits from 1. */
+    RIA.addr0 = CELL(ELEV_COL, ELEV_ROW);
+    RIA.step0 = 2;
+    for (i = 0; i < elevator_max; i++)
+        RIA.rw0 = (unsigned char)(0x31 + i);    /* screen code for '1' */
+    RIA.step0 = 1;
+    elevator_invert(ELEV_SELECTED);
+
+    for (;;) {
+        BACKGROUND_TASKS();
+        key = plat_getin();
+        if (!key)
+            continue;
+
+        if (key == 0x9D || key == KEY_MOVE_UP[2]) {             /* left */
+            if (elevator_floor > 1) {
+                elevator_invert(ELEV_NORMAL);
+                elevator_floor--;
+                elevator_invert(ELEV_SELECTED);
+                elevator_find_xy();
+            }
+        } else if (key == 0x1D || key == KEY_MOVE_UP[3]) {      /* right */
+            if (elevator_floor < elevator_max) {
+                elevator_invert(ELEV_NORMAL);
+                elevator_floor++;
+                elevator_invert(ELEV_SELECTED);
+                elevator_find_xy();
+            }
+        } else if (key == 0x11 || key == KEY_MOVE_UP[1]) {      /* down: leave */
+            elevator_invert(ELEV_NORMAL);
+            plat_scroll_info();
+            plat_scroll_info();
+            plat_scroll_info();
+            plat_clear_key_buffer();
+            return;
+        }
+    }
+}
 
 /* M6: the gamepad path. CONTROL is 0 or 1 here, so the AI never reaches this. */
 void plat_gamepad_read(void) { }
