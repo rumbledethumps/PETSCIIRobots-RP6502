@@ -2,24 +2,28 @@
 # David Murray's own instructions.
 #
 # The probe carries a checksum over every live unit's type and position, so
-# "the AI is running" is a peek rather than a screenshot. The emulator is
-# deterministic under --seed 1 and the RNG is seeded to a fixed value, so these
-# are exact: change an AI routine and they move, which is the point.
+# "the AI is running" is a peek rather than a screenshot. The RNG is seeded to a
+# fixed value and the emulator is deterministic, so the values are exact:
+# change an AI routine and they move, which is the point.
+#
+# The checkpoints are announced by the ROM at known frame numbers rather than
+# measured with `run` from the boot message. Loading the assets goes through the
+# host filesystem and does not take the same number of frames everywhere, so
+# counting from the boot message asserts partly on the host -- which is how an
+# earlier version of this file passed locally and failed in CI.
 #
 # Slot 0 is the player and has no AI. The dispatcher walks slots 1..63,
-# decrements each unit's timer, and runs its routine when the timer hits zero.
+# decrements each unit's timer, and runs its routine when the timer reaches zero.
 
-wait "BRINGUP OK"
+wait "AI60"
 
-# 16 live robots in level-a, and nothing drawn over the terrain yet: the player
+# 16 live robots in level-a, and nothing drawn over the terrain: the player
 # starts 25 tiles from the nearest one.
 peek xram:$FE07 $10
-peek xram:$FE0C $19 $4B $00
+peek xram:$FE0C $84 $40 $00
 
 # The hoverbots patrol, so the checksum moves.
-run 60
-peek xram:$FE0C $84 $40 $00
-run 240
+wait "AI300"
 peek xram:$FE0C $BE $4F $00
 
 # Walk to the hoverbot patrolling at x=36 and watch it appear in the window.

@@ -54,7 +54,10 @@ peek xram:$E048 $20 $00
 peek xram:$FE00 $50 $52 $02 $00 $16 $26
 peek xram:$FE0A $11 $23
 
-run 60
+# Anchor the frame on the AI's own clock rather than on `run 60`. How long
+# booting takes depends on the host filesystem, so counting frames from the
+# console line is not the same measurement on every machine.
+wait "AI60"
 
 # One golden frame. Regenerate with: python3 tools/emu-crc.py tests/emu/bringup.txt
 expect-crc E0A5D57D

@@ -21,6 +21,17 @@ static unsigned char player_direction = FACE_DOWN;
 static unsigned char player_animate;
 static unsigned char frame_counter;
 
+/* Frames since the game loop started, as opposed to frame_counter which wraps
+ * at 256 for the probe. Only used to announce two checkpoints on the console.
+ *
+ * Tests need a reference point that does not depend on how long booting took.
+ * Loading the assets goes through the host filesystem, and that is not the same
+ * number of frames on every machine -- which is exactly what made an earlier
+ * version of tests/emu/ai.txt pass here and fail in CI. Announcing a frame
+ * number gives the harness something to synchronise on that the AI's own clock
+ * defines. */
+static unsigned frames_total;
+
 /* USB HID keycodes. The RIA publishes a bit array of these, not PS/2 codes. */
 #define KEY_A 0x04
 #define KEY_D 0x07
@@ -291,6 +302,8 @@ int main(void)
             continue;
         last_vsync = v;
         frame_counter++;
+        if (++frames_total == 60 || frames_total == 300)
+            printf("AI%u\n", frames_total);
 
         /* The X16 raised this from its VBLANK interrupt. Here the main loop is
          * the frame, so it raises it before letting the AI run, and
