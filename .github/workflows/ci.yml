@@ -104,12 +104,10 @@ jobs:
           cmake --preset cc65/Release
           cmake --build --preset cc65/Release
 
-      # Every converted asset has to satisfy the invariants the platform layer
-      # assumes before it is allowed near the ROM.
-      - name: Verify the converted assets
-        run: python3 tests/assets/verify_assets.py
-
-      - name: Run the emulator script tests
+      # ctest runs the lot: the asset invariants the platform layer assumes, the
+      # converter's byte-identity check against the shipped X16 binaries, and
+      # the emulator scripts.
+      - name: Run the tests
         run: ctest --preset cc65/Release
 
       - uses: actions/upload-artifact@v4

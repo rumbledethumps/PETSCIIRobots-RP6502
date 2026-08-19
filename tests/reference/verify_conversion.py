@@ -9,7 +9,7 @@ That is the whole safety net for the port: it proves the converter preserves
 meaning, so the RP6502 sources in src/ start from provably-correct assembly and
 every later difference is a change we made on purpose.
 
-Run directly, or via ctest as `reference-conversion`.
+Run directly, or via ctest as `reference.conversion`.
 """
 import pathlib
 import re

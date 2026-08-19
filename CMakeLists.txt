@@ -29,8 +29,9 @@ if(PETSCII_TREE STREQUAL "rp6502")
     include(Assets)
     add_subdirectory(src)
 
-    # The emulator is a host program driven from outside, so the script suite
-    # belongs to the tree that builds the ROM it drives.
+    # The emulator is a host program driven from outside, and the asset checks
+    # read what this tree generates, so the whole suite belongs to the tree that
+    # builds the ROM.
     enable_testing()
-    add_subdirectory(tests/emu)
+    add_subdirectory(tests)
 endif()
