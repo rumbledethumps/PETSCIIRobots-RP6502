@@ -1,0 +1,28 @@
+# TAB draws the whole 128x64 map into the bitmap plane, one byte per tile
+# through MAP_TRANSLATION_TABLE, each row emitted twice so it fills 128x128
+# pixels under the blanked playfield.
+#
+# Leaving it restores the backdrop by reading the slice back out of the ROM
+# rather than blanking it, which costs the 6502 nothing and puts the real
+# artwork back instead of assuming it was black.
+
+wait "MENU"
+run 30
+press space
+run 6
+release space
+wait "AI60"
+
+press tab
+run 6
+release tab
+run 60
+expect-crc D38557F0
+shot "livemap.png"
+
+# Any other key returns to the game, and the window is redrawn.
+press space
+run 6
+release space
+run 30
+peek xram:$FE00 $50 $52 $02 $00 $16 $26

@@ -144,3 +144,82 @@ THREE_FACES:
 ;IN_GAME_MUSIC2:
 ;IN_GAME_MUSIC3:
 
+
+; Each tile as a single colour for the live map, from
+; reference/x16/x16Robots.ASM 5203-5267. Both nibbles are the same value,
+; because one map tile is drawn as two pixels of a 4bpp bitmap.
+MAP_TRANSLATION_TABLE:
+	.byte $00,$00,$11,$11
+	.byte $11,$11,$11,$11
+	.byte $11,$66,$11,$11
+	.byte $11,$11,$00,$11
+	.byte $11,$11,$11,$11
+	.byte $11,$11,$11,$11
+	.byte $55,$11,$11,$11
+	.byte $11,$EE,$88,$88
+	.byte $EE,$77,$22,$EE
+	.byte $EE,$77,$66,$EE
+	.byte $FF,$77,$88,$FF
+	.byte $FF,$77,$88,$FF
+	.byte $11,$11,$11,$FF
+	.byte $11,$55,$55,$FF
+	.byte $11,$55,$FF,$FF
+	.byte $66,$66,$11,$11
+	.byte $11,$11,$FF,$77
+	.byte $11,$11,$11,$11
+	.byte $FF,$FF,$FF,$FF
+	.byte $11,$11,$11,$11
+	.byte $11,$FF,$11,$FF
+	.byte $11,$FF,$11,$FF
+	.byte $11,$FF,$11,$11
+	.byte $11,$11,$11,$FF
+	.byte $88,$88,$00,$00
+	.byte $00,$00,$00,$00
+	.byte $11,$11,$11,$FF
+	.byte $FF,$FF,$66,$22
+	.byte $11,$11,$FF,$00
+	.byte $FF,$66,$FF,$11
+	.byte $11,$11,$88,$88
+	.byte $88,$88,$88,$88
+	.byte $11,$11,$00,$55
+	.byte $11,$FF,$00,$55
+	.byte $FF,$FF,$FF,$66
+	.byte $00,$00,$00,$FF
+	.byte $11,$11,$11,$11
+	.byte $88,$66,$88,$88
+	.byte $11,$11,$FF,$FF
+	.byte $88,$88,$FF,$66
+	.byte $88,$88,$88,$66
+	.byte $00,$00,$11,$FF
+	.byte $66,$BB,$11,$FF
+	.byte $11,$11,$11,$00
+	.byte $11,$11,$11,$11
+	.byte $11,$11,$11,$88
+	.byte $11,$11,$11,$11
+	.byte $11,$BB,$11,$11
+	.byte $11,$11,$11,$11
+	.byte $FF,$FF,$55,$DD
+	.byte $FF,$FF,$FF,$FF
+	.byte $66,$88,$99,$99
+	.byte $55,$55,$55,$DD
+	.byte $FF,$FF,$BB,$DD
+	.byte $11,$11,$11,$DD
+	.byte $11,$11,$11,$DD
+	.byte $11,$11,$11,$77
+	.byte $BB,$BB,$77,$77
+	.byte $BB,$BB,$77,$77
+	.byte $11,$11,$00,$00
+	.byte $00,$00,$CC,$00
+	.byte $00,$00,$00,$00
+	.byte $00,$00,$00,$00
+	.byte $00,$00,$00,$00
+
+
+; The game over box and the two endings, from reference/x16/x16Robots.ASM
+; 3926-3928 and 3977-3978. The box is PETSCII line drawing -- corners and
+; horizontal rules around the words -- eleven characters to a row.
+GAMEOVER1:	.byte $70,$40,$40,$40,$40,$40,$40,$40,$40,$40,$6e
+GAMEOVER2:	.byte $5d,$07,$01,$0d,$05,$20,$0f,$16,$05,$12,$5d
+GAMEOVER3:	.byte $6d,$40,$40,$40,$40,$40,$40,$40,$40,$40,$7d
+WIN_MSG:	.byte 25,15,21,32,23,9,14,33
+LOS_MSG:	.byte 25,15,21,32,12,15,19,5,33

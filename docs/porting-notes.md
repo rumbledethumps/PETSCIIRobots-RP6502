@@ -217,3 +217,37 @@ with `press`.
 `frames_total`, which the tests synchronise on, is reset when play starts rather
 than counted from boot, so a checkpoint means the same thing however long
 someone sat on the menu.
+
+## The live map, and the end of a game
+
+TAB draws the whole 128x64 map into the bitmap plane through
+`MAP_TRANSLATION_TABLE`, one byte per tile with each row emitted twice so it
+fills 128x128 pixels under the blanked playfield. Both copies of a row go out
+together, portal 0 to the even scanline and portal 1 to the odd one, so each
+tile is translated once. Leaving restores the backdrop by reading the slice back
+out of the ROM rather than blanking it, which costs the 6502 nothing and puts
+the real artwork back instead of assuming it was black.
+
+The stats screen needs the backdrop out of the way. The X16 turns VERA's layer 0
+off; mode 3 has no enable bit, but the plane's position is a signed pixel offset,
+so `x_pos_px = -320` moves it a screenful left without disturbing the pixels.
+
+### Anything an interrupt writes has to be volatile
+
+`GAME_OVER` waits by spinning on `KEYTIMER`, which the VSYNC handler decrements.
+Without `volatile` the compiler is entitled to hoist the load out of the loop,
+and it does: the game reached the GAME OVER box and stayed there. Every variable
+`src/game/irq.s` touches is declared volatile in `game.h` now.
+
+Worth noting for anyone debugging the emulator scripts: `expect` consumes the
+console buffer up to the point it checks, so two `expect`s in a row after a
+single `run` will see the second string as missing even when it was printed.
+`wait` is the one to use when checking that a sequence of things happened.
+
+### Not yet covered by a test
+
+Game over is verified by hand, not by a script. Dying takes a long walk to the
+robots, and winning needs the transporter at 74,45 -- 59 tiles away, and it only
+activates once every robot is dead. Both endings were checked with a throwaway
+build that forced the transition; the screens are right, but until there is a
+way to script a death cheaply this is the one path CI does not cover.

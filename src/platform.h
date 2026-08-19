@@ -22,8 +22,11 @@ void plat_load_bitmap(const char *name);
 void plat_display_intro_screen(void);
 void plat_display_game_screen(void);
 void plat_display_endgame_screen(void);
+void __fastcall__ plat_backdrop_visible(unsigned char on);
 void __fastcall__ plat_flash_menu_option(unsigned char color);
 void plat_display_map_name(void);
+void plat_display_map(void);
+void plat_game_over(void);
 void plat_change_difficulty_level(void);
 void plat_gamepad_read(void);
 

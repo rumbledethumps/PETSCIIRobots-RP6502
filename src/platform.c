@@ -7,12 +7,18 @@
 #include <fcntl.h>
 #include <rp6502.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include "game/game.h"
 #include "input.h"
 #include "platform.h"
 #include "xram.h"
+
+static void park_sprite(unsigned char slot);
+static void decwrite(unsigned char col, unsigned char row, unsigned char v);
+static void put_glyphs(unsigned char col, unsigned char row,
+                       const unsigned char *g, unsigned char n);
 
 /* TILESET.GFX, reorganised by tools/convert/conv_tiles.py: each game tile is
  * three character rows of six bytes -- glyph, colour, glyph, colour, glyph,
@@ -176,6 +182,7 @@ void plat_load_bitmap(const char *name)
 
 void plat_display_intro_screen(void)
 {
+    plat_backdrop_visible(1);
     plat_green_screen();
     plat_decompress_screen(INTRO_TEXT, 0);
     plat_load_bitmap("ROM:intropic");
@@ -183,13 +190,28 @@ void plat_display_intro_screen(void)
 
 void plat_display_game_screen(void)
 {
+    plat_backdrop_visible(1);
     plat_green_screen();
     plat_decompress_screen(SCR_TEXT, 0);
     plat_load_bitmap("ROM:gamepic");
 }
 
+/* Slide the backdrop off the canvas. The X16 turns layer 0 off for the stats
+ * screen; mode 3 has no enable bit, but the plane's position is a signed pixel
+ * offset, so putting it a screenful to the left has the same effect and does
+ * not disturb the pixels underneath. */
+void __fastcall__ plat_backdrop_visible(unsigned char on)
+{
+    int x = on ? 0 : -320;
+    RIA.addr0 = XR_CFG_BITMAP + 2;      /* x_pos_px, after the two wrap flags */
+    RIA.step0 = 1;
+    RIA.rw0 = (unsigned char)(x & 0xFF);
+    RIA.rw0 = (unsigned char)(x >> 8);
+}
+
 void plat_display_endgame_screen(void)
 {
+    plat_backdrop_visible(0);
     plat_green_screen();
     plat_decompress_screen(SCR_ENDGAME, 0);
 }
@@ -235,6 +257,228 @@ void plat_change_difficulty_level(void)
         for (i = 0; i < 8; i++)
             RIA.rw0 = *p++;
     }
+}
+
+/* ---- the end of a game ------------------------------------------------ */
+
+/* The box, eleven characters wide at column 11, rows 9 to 11, in white. */
+static void game_over_box(void)
+{
+    static const unsigned char *const rows[3] = { GAMEOVER1, GAMEOVER2, GAMEOVER3 };
+    unsigned char r, i;
+    for (r = 0; r < 3; r++) {
+        RIA.addr0 = CELL(11, 9 + r);
+        RIA.step0 = 1;
+        for (i = 0; i < 11; i++) {
+            RIA.rw0 = rows[r][i];
+            RIA.rw0 = 1;                /* white */
+        }
+    }
+}
+
+/* The stats screen: which level, how long it took, and what was left. */
+static void endgame_stats(void)
+{
+    const unsigned char *name = MAP_NAMES + (unsigned)SELECTED_MAP * 16;
+    unsigned char i, robots = 0, secrets = 0;
+
+    RIA.addr0 = CELL(22, 7);
+    RIA.step0 = 2;
+    for (i = 0; i < 16; i++)
+        RIA.rw0 = *name++;
+    RIA.step0 = 1;
+
+    decwrite(21, 9, HOURS);
+    decwrite(24, 9, MINUTES);
+    decwrite(27, 9, SECONDS);
+    /* Blank the leading digit of the hours and put colons between the fields,
+     * exactly where the original pokes them. */
+    put_glyphs(21, 9, (const unsigned char *)"\x20", 1);
+    put_glyphs(24, 9, (const unsigned char *)"\x3A", 1);
+    put_glyphs(27, 9, (const unsigned char *)"\x3A", 1);
+
+    for (i = 1; i < 28; i++)
+        if (UNIT_TYPE[i])
+            robots++;
+    for (i = 48; i < 64; i++)
+        if (UNIT_TYPE[i])
+            secrets++;
+    decwrite(28, 11, robots);
+    decwrite(28, 13, secrets);
+
+    {   /* easy / normal / hard, in screen codes */
+        static const unsigned char words[3][6] = {
+            {  5,  1, 19, 25, 32, 32 },
+            { 14, 15, 18, 13,  1, 12 },
+            {  8,  1, 18,  4, 32, 32 },
+        };
+        put_glyphs(28, 15, words[DIFF_LEVEL < 3 ? DIFF_LEVEL : 1], 6);
+    }
+}
+
+/* The player is dead, or has reached the transporter. Show the box, wait, then
+ * the stats screen, then back to the title. */
+void plat_game_over(void)
+{
+    const unsigned char *msg;
+    unsigned char i, n, key;
+
+    CLOCK_ACTIVE = 0;
+
+    if (!UNIT_TYPE[0]) {                /* died rather than won */
+        PLAYER_DIRECTION = FACE_DEAD;
+        PLAYER_ANIMATE = 0;
+        plat_display_player_sprite();
+        KEYTIMER = 100;
+        while (KEYTIMER)
+            BACKGROUND_TASKS();
+    }
+    SCREEN_SHAKE = 0;
+    game_over_box();
+
+    KEYTIMER = 100;                     /* ignore keys for a moment */
+    while (KEYTIMER)
+        BACKGROUND_TASKS();
+    plat_clear_key_buffer();
+    do {
+        BACKGROUND_TASKS();
+        key = plat_getin();
+    } while (!key);
+
+    /* The stats. Sprites go away with the playfield. */
+    for (i = 0; i < SPR_COUNT; i++)
+        park_sprite(i);
+    plat_display_endgame_screen();
+    endgame_stats();
+
+    msg = UNIT_TYPE[0] ? WIN_MSG : LOS_MSG;
+    n = (unsigned char)(UNIT_TYPE[0] ? 8 : 9);
+    put_glyphs(16, 3, msg, n);
+    plat_play_sound(UNIT_TYPE[0] ? SFX_FOUNDITEM : SFX_ERROR);
+
+    plat_clear_key_buffer();
+    do {
+        BACKGROUND_TASKS();
+        key = plat_getin();
+    } while (!key);
+}
+
+/* ---- the live map ----------------------------------------------------- */
+
+/* TAB shows the whole 128x64 map drawn into the bitmap plane, one byte per
+ * tile, each row emitted twice so it fills 128x128 pixels. It starts at pixel
+ * row 36, and the bitmap is 160 bytes a row.
+ *
+ * The playfield characters are blanked first so the map underneath shows
+ * through -- the character plane sits over the bitmap, and its transparent
+ * cells are what let the backdrop be seen at all. */
+#define LIVEMAP_TOP 36
+
+static void clear_playfield(void)
+{
+    unsigned char row, i;
+    RIA.step0 = 1;
+    for (row = 2; row < 27; row++) {
+        RIA.addr0 = CELL(0, row);
+        for (i = 0; i < 33; i++) {
+            RIA.rw0 = 32;
+            RIA.rw0 = 0;                /* transparent */
+        }
+    }
+}
+
+static void draw_live_map(void)
+{
+    const unsigned char *m = MAP;
+    unsigned char row, col;
+    unsigned addr;
+
+    /* Both copies of a row go out together, portal 0 to the even scanline and
+     * portal 1 to the odd one, so the map byte is only translated once. */
+    RIA.step0 = 1;
+    RIA.step1 = 1;
+    for (row = 0; row < MAP_H; row++) {
+        addr = (unsigned)(LIVEMAP_TOP + row * 2) * 160u;
+        RIA.addr0 = addr;
+        RIA.addr1 = addr + 160u;
+        for (col = 0; col < MAP_W; col++) {
+            unsigned char c = MAP_TRANSLATION_TABLE[*m++];
+            RIA.rw0 = c;
+            RIA.rw1 = c;
+        }
+    }
+}
+
+/* A unit's position as two pixels on the live map, doubled the same way. */
+static void plot_map_dot(unsigned char slot, unsigned char color)
+{
+    unsigned addr = (unsigned)(LIVEMAP_TOP + UNIT_LOC_Y[slot] * 2) * 160u
+                  + (UNIT_LOC_X[slot] >> 1);
+    RIA.step0 = 1;
+    RIA.addr0 = addr;
+    RIA.rw0 = color;
+    RIA.addr0 = addr + 160u;
+    RIA.rw0 = color;
+}
+
+static void blink_dots(unsigned char color, unsigned char robots)
+{
+    unsigned char i;
+    if (!robots) {
+        plot_map_dot(0, color);
+        return;
+    }
+    for (i = 1; i < 28; i++)
+        if (UNIT_TYPE[i] && UNIT_TYPE[i] != 8)   /* 8 is a dead robot */
+            plot_map_dot(i, color);
+}
+
+/* Restore the backdrop under the map rather than blanking it: the bitmap is a
+ * file, so reading the slice back costs the 6502 nothing. */
+static void restore_backdrop(void)
+{
+    int fd = open("ROM:gamepic", O_RDONLY);
+    if (fd < 0)
+        return;
+    lseek(fd, (long)LIVEMAP_TOP * 160L, SEEK_SET);
+    read_xram((unsigned)LIVEMAP_TOP * 160u, 128u * 160u, fd);
+    close(fd);
+}
+
+/* The TAB screen. Holds until a key, blinking the player or the robots; TAB
+ * itself switches between the two, as it does on the X16. */
+void plat_display_map(void)
+{
+    unsigned char robots = 0, color = 0, key;
+
+    SCREEN_SHAKE = 0;
+    plat_play_sound(SFX_BEEP2);
+    clear_playfield();
+    park_sprite(SPR_PLAYER);
+    draw_live_map();
+
+    for (;;) {
+        if (!BGTIMER2) {
+            color = (unsigned char)(color ? 0x00 : 0x11);
+            blink_dots(color, robots);
+            BGTIMER2 = 30;
+        }
+        BACKGROUND_TASKS();
+        key = plat_getin();
+        if (!key)
+            continue;
+        if (key == 9) {                 /* TAB toggles player and robots */
+            plat_play_sound(SFX_BEEP2);
+            robots = (unsigned char)!robots;
+            continue;
+        }
+        break;
+    }
+
+    restore_backdrop();
+    plat_display_player_sprite();
+    plat_play_sound(SFX_BEEP2);
+    REDRAW_WINDOW = 1;
 }
 
 /* ---- the message console --------------------------------------------- */

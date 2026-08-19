@@ -73,14 +73,13 @@ extern unsigned char UNIT_TIMER_A[64], UNIT_TIMER_B[64];
 extern unsigned char UNIT_TILE[32];     /* the tile each visible unit draws as */
 extern unsigned char MAP_PRECALC[77];   /* units inside the 11x7 window        */
 
-/* Set once a frame by the main loop; BACKGROUND_TASKS consumes it. On the X16
- * this was the IRQ's job. */
-extern unsigned char BGTIMER1, BGTIMER2;
-
-/* Maintained by the VSYNC interrupt in src/game/irq.s. IRQ_FRAME is the frame
- * reference anything outside the interrupt uses to know time has passed. */
-extern unsigned char IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE;
-extern unsigned char CYCLES, SECONDS, MINUTES, HOURS;
+/* Maintained by the VSYNC interrupt in src/game/irq.s, so every one of them is
+ * volatile: the game waits on these by spinning, and without it the compiler is
+ * entitled to hoist the load out of the loop and spin forever. IRQ_FRAME is the
+ * tick reference anything outside the interrupt uses to know time has passed. */
+extern volatile unsigned char BGTIMER1, BGTIMER2;
+extern volatile unsigned char IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE;
+extern volatile unsigned char CYCLES, SECONDS, MINUTES, HOURS;
 extern unsigned char KEYS, INV_MAGNET;
 
 /* Only one of each may be running at a time. */
@@ -138,6 +137,14 @@ extern unsigned char MAP_NAMES[];       /* fourteen sixteen-byte names       */
 /* Screen layouts, run-length encoded 40x30 grids. */
 extern unsigned char INTRO_TEXT[], SCR_TEXT[], SCR_ENDGAME[], SCR_CUSTOM_KEYS[];
 extern unsigned char CINEMA_MESSAGE[], THREE_FACES[];
+
+/* One colour per tile for the live map, both nibbles the same because a map
+ * tile is two pixels of a 4bpp bitmap. */
+extern unsigned char MAP_TRANSLATION_TABLE[256];
+
+/* The game over box, eleven characters a row, and the two endings. */
+extern unsigned char GAMEOVER1[11], GAMEOVER2[11], GAMEOVER3[11];
+extern unsigned char WIN_MSG[8], LOS_MSG[9];
 
 /* Screen-code strings: 0 ends one, 255 forces a new line. */
 extern unsigned char INTRO_MESSAGE[];

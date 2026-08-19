@@ -37,7 +37,8 @@ PETSCII_INC = 1
 ; ---- messages -----------------------------------------------------------
         .global INTRO_MESSAGE
         .global INTRO_TEXT, SCR_TEXT, SCR_ENDGAME, SCR_CUSTOM_KEYS
-        .global CINEMA_MESSAGE, THREE_FACES
+        .global CINEMA_MESSAGE, THREE_FACES, MAP_TRANSLATION_TABLE
+        .global GAMEOVER1, GAMEOVER2, GAMEOVER3, WIN_MSG, LOS_MSG
         .global MSG_TERMINATED, MSG_TRANS1, MSG_ELEVATOR, MSG_LEVELS
         .global MSG_BLOCKED, MSG_CANTMOVE, MSG_EMPUSED, MSG_MUCHBET
         .global MSG_NOTFOUND, MSG_SEARCHING

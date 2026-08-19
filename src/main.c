@@ -355,8 +355,15 @@ int main(void)
 
         BACKGROUND_TASKS();
 
-        if (UNIT_TYPE[0] != 1)
-            continue;                   /* dead; M6 brings the game over screen */
+        /* Unit 0 stops being type 1 when the player dies or reaches the
+         * transporter, which is how the AI signals both endings. */
+        if (UNIT_TYPE[0] != 1) {
+            plat_game_over();
+            intro_screen();
+            init_game();
+            frames_total = 0;
+            continue;
+        }
 
         key = plat_getin();
         if (!key)
@@ -388,5 +395,7 @@ int main(void)
             SEARCH_OBJECT();
         else if (key == KEY_MOVE_UP[12])
             MOVE_OBJECT();
+        else if (key == 9)              /* TAB: the whole map */
+            plat_display_map();
     }
 }
