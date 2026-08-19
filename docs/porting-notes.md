@@ -126,6 +126,24 @@ files while you look for it.
 build, and `tests/reference/verify_conversion.py` checks the partition and the
 assertions are still there. Both were verified by breaking them.
 
+Owning the range means owning its startup. cc65's `zerobss` clears the BSS
+segment and a zeropage segment is not part of it, so `GAMEZP` came up holding
+whatever the SRAM held. Everything in it is written before it is read but one:
+`SCREEN_SHAKE`, which the VSYNC interrupt reads from the moment `main()` enables
+the interrupt, and that is before any game code has touched it. A stale `$38`
+put the character plane four pixels left on alternate frames -- the intro menu's
+text and, later, the tile window blurring against a bitmap plane that held
+still.
+
+Only on hardware. `ram[]` in the emulator is a C array with static storage, so
+it starts zeroed and the fault could not happen there, which is a general shape
+worth remembering: the emulator hands the program a clean machine, and a Pico
+or a Pocket hands it the last one's leavings. `globals.s` now zeroes the whole
+area from a `.constructor`, spanning it with the linker's own
+`__GAMEZP_START__` and `__GAMEZP_SIZE__` rather than repeating the addresses.
+`tests/emu/gamezp.txt` fills the page with `$FF` before the ROM's startup runs
+and watches the plane hold still for a full shake cycle.
+
 ### A fixed bug
 
 `DEMATERIALIZE` (`x16Robots.ASM:4817`) loads X with 40 as a VERA register value

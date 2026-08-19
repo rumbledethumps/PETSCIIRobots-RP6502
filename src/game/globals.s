@@ -64,6 +64,28 @@ CUR_PATTERN:    .res 2          ; $3A  the music pattern being played
         .assert MOVE_TYPE     = $37, error, "MOVE_TYPE moved"
         .assert CUR_PATTERN   = $3A, error, "CUR_PATTERN moved"
 
+; Zeroed at startup, because nothing else does it. cc65's zerobss clears the BSS
+; segment and a zeropage segment is not part of it, so every byte above comes up
+; holding whatever the SRAM held. The ported code expects the zeros the X16 gave
+; it: SCREEN_SHAKE is the one that shows, since the interrupt reads it from the
+; moment it is enabled -- before any game code has written it -- and a stale $38
+; shakes the character plane through the intro menu and on into play. The
+; emulator hides it, its RAM starting zeroed, so this only ever appeared on
+; hardware.
+
+        .segment "ONCE"
+
+        .import __GAMEZP_START__, __GAMEZP_SIZE__
+        .constructor gamezp_init
+
+gamezp_init:
+        lda     #0
+        ldx     #<(__GAMEZP_SIZE__ - 1)
+@loop:  sta     __GAMEZP_START__,x
+        dex
+        bpl     @loop
+        rts
+
 ; ---- level data ---------------------------------------------------------
         .segment "LEVELDATA"
 
