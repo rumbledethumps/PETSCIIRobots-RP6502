@@ -88,7 +88,13 @@ def check_no_raw_zeropage() -> int:
     miss because it does not look like the direct form.
     """
     bad = []
-    pat = re.compile(r'(?<![#$0-9A-Fa-f])\$0[0-9A-Fa-f](?![0-9A-Fa-f])')
+    # Only instruction operands. A .byte line full of screen codes is data --
+    # $0D there is the letter M, not an address -- so flagging that would make
+    # this check noise rather than a guard.
+    ops = ("lda|sta|ldx|stx|ldy|sty|cmp|cpx|cpy|adc|sbc|and|ora|eor|bit"
+           "|asl|lsr|rol|ror|inc|dec|jmp|jsr|stz|trb|tsb")
+    pat = re.compile(r"\b(?:" + ops + r")\s+\(?\$0[0-9A-Fa-f](?![0-9A-Fa-f])",
+                     re.IGNORECASE)
     for path in sorted((ROOT / "src" / "game").glob("*.s")):
         for n, line in enumerate(path.read_text().splitlines(), 1):
             code = line.split(";", 1)[0]
