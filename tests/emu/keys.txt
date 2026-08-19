@@ -1,0 +1,44 @@
+# Key repeat with more than one key down.
+#
+# The RIA gives a bit array of the keys currently held, not a stream of events,
+# so src/input.c has to work out presses and repeats itself. Keeping only "the
+# key being repeated" is not enough, and getting it wrong is felt immediately:
+# hold down, tap right, let right go, and the player carries on going right
+# while you are still holding down. The key that was released has to stop
+# repeating and whatever is still held has to take over.
+#
+# level-a's start at 22,38 is open ground in both directions, so each leg moves
+# freely and the direction is unambiguous.
+
+wait "MENU"
+run 30
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 20
+peek xram:$FE04 $16 $26
+
+# Hold down: five squares down, none sideways. The count follows the repeat
+# rate the game sets in AFTER_MOVE, 15 frames then 7; the direction is the point.
+press k
+run 40
+peek xram:$FE04 $16 $2B
+
+# Add right, keeping down held. The newest key wins, so he goes right.
+press l
+run 40
+peek xram:$FE04 $1C $2B
+
+# Let right go. Down is still held, so he goes down again -- and takes over at
+# once rather than after another repeat delay, because waiting reads as the game
+# ignoring a key you never let go of. Before this worked, x ran on to $1F here
+# and y did not move at all.
+release l
+run 40
+peek xram:$FE04 $1C $31
+
+# Nothing held, nothing moves.
+release k
+run 20
+peek xram:$FE04 $1C $31

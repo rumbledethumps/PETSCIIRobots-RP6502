@@ -21,13 +21,15 @@ wait "BRINGUP OK"
 # 'P','R', playing, level a, player 22,38
 peek xram:$FE00 $50 $52 $02 $00 $16 $26
 
-# A few squares right, then back. The exact count depends on the key repeat,
-# which is the platform layer's business; what matters is the stop.
+# A few squares right, then back. The count depends on the repeat rate the game
+# sets for itself in AFTER_MOVE -- 15 frames before the first repeat and 7 after
+# -- so it moves whenever that changes. What the test is really for is the stop
+# below.
 press l
 run 40
 release l
 run 4
-peek xram:$FE04 $1A
+peek xram:$FE04 $1B
 
 # Now left, held far longer than it takes to cross the twelve open squares.
 press j

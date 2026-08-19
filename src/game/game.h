@@ -79,6 +79,7 @@ extern unsigned char MAP_PRECALC[77];   /* units inside the 11x7 window        *
  * tick reference anything outside the interrupt uses to know time has passed. */
 extern volatile unsigned char BGTIMER1, BGTIMER2;
 extern volatile unsigned char IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE;
+extern unsigned char KEY_FAST;          /* 0 until a held move key repeats  */
 extern volatile unsigned char CYCLES, SECONDS, MINUTES, HOURS;
 extern unsigned char KEYS, INV_MAGNET;
 

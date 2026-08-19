@@ -338,6 +338,40 @@ the map rather than drawn over it. Level-g starts with a robot already in view,
 so it reaches the path on the first frame -- and getting there drives the intro
 menu's map option, which nothing else did either.
 
+## Key repeat: the original has one, and I had not used it
+
+Reported as "controls suck ass: press down, press right, release right and you
+keep going right". Correct, and the cause was that `src/input.c` was invented
+rather than ported.
+
+The X16 does have this logic. `KEY_REPEAT` (x16Robots.ASM 1988) runs at the top
+of the main game loop, before `GETIN`. It reads `$C5` -- LSTX, the key the
+KERNAL currently has down -- and when `KEYTIMER` reaches zero it writes 64 back
+to it, which makes the KERNAL believe the key was pressed again and put another
+copy in the buffer. The rates are the *game's*, not the input layer's:
+`AFTER_MOVE` sets `KEYTIMER` to 15 before the first repeat of a held direction
+and 7 after that, firing and cycling set 20, `INIT_GAME` sets 30, the game-over
+wait sets 100.
+
+Two things were wrong here. The first is that this port kept "the key being
+repeated" as a single remembered code, set on a fresh press and cleared only
+when *nothing* was down -- so releasing the newer of two held keys left the
+released one repeating. The original cannot have that fault, because it reads
+what is down now rather than remembering. The second is bigger: `KEYTIMER` was
+written in twenty-odd places in the original and in **none** in this port, so
+the game's own pacing was not connected at all and the input layer had invented
+its own timings (20 and 7) in its place.
+
+Now `plat_key_repeat` is `KEY_REPEAT` -- newest key still down in the RIA's bit
+array standing in for LSTX, and pushing onto the queue `plat_getin` drains
+standing in for clearing it -- and the game sets `KEYTIMER` where the original
+sets it. `tests/emu/keys.txt` holds down, taps right, releases right and checks
+he goes down; before the fix x ran on and y did not move.
+
+Worth stating plainly: the menus call `GETIN` alone and only the game loop calls
+`KEY_REPEAT` first, which is why menus act on presses and only walking repeats.
+That is the original's arrangement, not a choice made here.
+
 ## Driving the game further than a fixed list of keys can reach
 
 `tests/emu` scripts are open loop: press keys, check results, with no way to ask

@@ -175,6 +175,17 @@ static void walk(unsigned char facing, void (*request)(void))
         /* Facing changes even when the way is blocked, as it does on the X16. */
         plat_display_player_sprite();
     }
+
+    /* AFTER_MOVE's tail: the first repeat of a held direction waits 15 frames,
+     * every one after that waits 7. Setting it here rather than in the input
+     * layer is the original's arrangement and the reason it feels right -- the
+     * pause is measured from the move actually happening, not from the poll. */
+    if (KEY_FAST) {
+        KEYTIMER = 7;
+    } else {
+        KEYTIMER = 15;
+        KEY_FAST = 1;
+    }
 }
 
 /* CYCLE_WEAPON and CYCLE_ITEM: step to the next one and let the display
@@ -182,6 +193,7 @@ static void walk(unsigned char facing, void (*request)(void))
 static void cycle_weapon(void)
 {
     plat_play_sound(SFX_CYCLEWEAPON);
+    KEYTIMER = 20;
     SELECTED_WEAPON = (unsigned char)(SELECTED_WEAPON == 1 ? 2 : 1);
     plat_display_weapon();
 }
@@ -189,6 +201,7 @@ static void cycle_weapon(void)
 static void cycle_item(void)
 {
     plat_play_sound(SFX_CYCLEITEM);
+    KEYTIMER = 20;
     SELECTED_ITEM = (unsigned char)(SELECTED_ITEM >= 4 ? 1 : SELECTED_ITEM + 1);
     plat_display_item();
 }
@@ -289,6 +302,8 @@ static void init_game(void)
     SELECTED_WEAPON = SELECTED_ITEM = 0;
     MAGNET_ACT = PLASMA_ACT = BIG_EXP_ACT = 0;
     CYCLES = SECONDS = MINUTES = HOURS = 0;
+    KEYTIMER = 30;                      /* INIT_GAME: a beat before he can move */
+    KEY_FAST = 0;
 
     plat_display_game_screen();
 
@@ -390,6 +405,9 @@ int main(void)
             continue;
         }
 
+        /* KY01: KEY_REPEAT then GETIN. The menus call GETIN alone, which is
+         * why they act on presses and only walking repeats. */
+        plat_key_repeat();
         key = plat_getin();
         if (!key)
             continue;
@@ -402,14 +420,22 @@ int main(void)
             walk(FACE_DOWN, REQUEST_WALK_DOWN);
         else if (key == 0x91 || key == KEY_MOVE_UP[0])
             walk(FACE_UP, REQUEST_WALK_UP);
-        else if (key == KEY_MOVE_UP[4])
+        else if (key == KEY_MOVE_UP[4]) {
             FIRE_UP();
-        else if (key == KEY_MOVE_UP[5])
+            KEYTIMER = 20;              /* MG14 */
+        }
+        else if (key == KEY_MOVE_UP[5]) {
             FIRE_DOWN();
-        else if (key == KEY_MOVE_UP[6])
+            KEYTIMER = 20;              /* MG15 */
+        }
+        else if (key == KEY_MOVE_UP[6]) {
             FIRE_LEFT();
-        else if (key == KEY_MOVE_UP[7])
+            KEYTIMER = 20;              /* MG16 */
+        }
+        else if (key == KEY_MOVE_UP[7]) {
             FIRE_RIGHT();
+            KEYTIMER = 20;              /* MG17 */
+        }
         else if (key == KEY_MOVE_UP[8])
             cycle_weapon();
         else if (key == KEY_MOVE_UP[9])

@@ -43,14 +43,25 @@
 #define HID_DOWN  0x51
 #define HID_UP    0x52
 
-/* The key repeat the X16 got from the KERNAL: a long wait before the first
- * repeat, then a short one. Measured in frames. */
-#define REPEAT_DELAY 20
-#define REPEAT_RATE   7
+/* KEY_REPEAT's own floor, from x16Robots.ASM 1999. The interesting rates are
+ * not here: the game sets KEYTIMER itself after it acts -- 15 frames before the
+ * first repeat of a move and 7 after that, 20 after firing or cycling -- and
+ * this is only what KEY_REPEAT leaves behind when it re-injects. */
+#define REPEAT_FLOOR 7
 
 static unsigned char now[32], before[32];
 static unsigned char queue[8], q_head, q_tail;
-static unsigned char held_code, held_timer;
+
+/* The keys physically down, as HID codes, oldest first -- so the last entry is
+ * the one that arrived most recently and the one that should be repeating.
+ *
+ * A single "which key is held" byte is not enough, and getting that wrong is
+ * felt immediately: hold down, tap right, let right go, and the player carries
+ * on right while you are holding down. The key that was released has to stop
+ * repeating and whatever is still held has to take over, which means keeping
+ * the whole set and the order they arrived in. Eight is more fingers than
+ * anyone brings. */
+static unsigned char held[8], held_n;
 
 /* HID keycode -> the code the game compares against. These are the PETSCII
  * values KERNAL GETIN produced, so STANDARD_CONTROLS and every CMP in the
@@ -94,16 +105,17 @@ void input_init(void)
     unsigned char i;
     for (i = 0; i < 32; i++)
         before[i] = 0;
-    q_head = q_tail = held_code = held_timer = 0;
+    q_head = q_tail = held_n = 0;
     xreg_ria_keyboard(XR_KEYBOARD);
     polled_frame = IRQ_FRAME;
 }
 
-/* Queues a code for every key that went down since the last call, and one more
- * each time the repeat timer expires on the key still held. */
+/* Queues a code for every key that went down since the last call, and keeps the
+ * held set up to date. Repeats are not this routine's business; see
+ * plat_key_repeat. */
 static void input_poll(void)
 {
-    unsigned char i, b, hid, code;
+    unsigned char i, j, b, hid, code;
 
     RIA.addr0 = XR_KEYBOARD;
     RIA.step0 = 1;
@@ -123,8 +135,12 @@ static void input_poll(void)
             code = translate((unsigned char)((i << 3) | hid));
             if (code) {
                 push(code);
-                held_code = code;
-                held_timer = REPEAT_DELAY;
+                if (held_n == 8) {      /* forget the oldest to make room */
+                    for (j = 0; j < 7; j++)
+                        held[j] = held[j + 1];
+                    held_n = 7;
+                }
+                held[held_n++] = (unsigned char)((i << 3) | hid);
             }
         }
         before[i] = now[i];
@@ -132,16 +148,11 @@ static void input_poll(void)
     for (i = 0; i < 32; i++)
         before[i] = now[i];
 
-    if (now[0] & HID_NONE_DOWN) {
-        held_code = 0;                  /* nothing held: no repeat pending */
-    } else if (held_code) {
-        if (held_timer)
-            held_timer--;
-        else {
-            push(held_code);
-            held_timer = REPEAT_RATE;
-        }
-    }
+    /* Drop the ones that have been let go, keeping the rest in order. */
+    for (i = 0, j = 0; i < held_n; i++)
+        if (key_down(now, held[i]))
+            held[j++] = held[i];
+    held_n = j;
 }
 
 /* What KERNAL GETIN returned: the next key code, or zero if none is waiting.
@@ -165,5 +176,37 @@ unsigned char plat_getin(void)
 void plat_clear_key_buffer(void)
 {
     q_head = q_tail = 0;
-    held_code = 0;
+}
+
+/* KEY_REPEAT, from x16Robots.ASM 1988. The main game loop calls this before
+ * GETIN; the menus do not, which is why a menu acts on presses only and walking
+ * repeats.
+ *
+ * The X16 reads $C5 -- LSTX, the key the KERNAL currently has down -- and, when
+ * KEYTIMER runs out, writes 64 back to it. That makes the KERNAL believe the
+ * key was pressed again, so it puts another copy in the buffer for GETIN to
+ * find. Here the equivalent of LSTX is the newest key still down in the RIA's
+ * bit array, and the equivalent of clearing it is pushing that code onto the
+ * queue GETIN reads.
+ *
+ * Reading what is down *now* is the whole point, and is why the original does
+ * not have the fault this port did: hold down, tap right, let right go, and the
+ * key that is still down is down, so the player goes down. A remembered "the
+ * key being repeated" keeps repeating the one you let go of.
+ */
+void plat_key_repeat(void)
+{
+    if (polled_frame != IRQ_FRAME) {
+        polled_frame = IRQ_FRAME;
+        input_poll();
+    }
+    if (KEYTIMER)
+        return;
+    if (!held_n) {
+        KEY_FAST = 0;                   /* KEYR1: back to the slow first repeat */
+        KEYTIMER = REPEAT_FLOOR;
+        return;
+    }
+    push(translate(held[held_n - 1]));
+    KEYTIMER = REPEAT_FLOOR;
 }

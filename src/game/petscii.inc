@@ -43,7 +43,7 @@ PETSCII_INC = 1
         .globalzp PRECALC_COUNT
         .global UNIT_TIMER_A, UNIT_TIMER_B, UNIT_TILE, EXP_BUFFER, MAP_PRECALC
         .global BGTIMER1, BGTIMER2, BIG_EXP_ACT, MAGNET_ACT, PLASMA_ACT
-        .global IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE, CYCLES, SECONDS, MINUTES, HOURS
+        .global IRQ_FRAME, KEY_FAST, KEYTIMER, CLOCK_ACTIVE, CYCLES, SECONDS, MINUTES, HOURS
         .global KEYS, INV_MAGNET, BORDER
 
 ; ---- messages -----------------------------------------------------------

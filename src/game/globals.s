@@ -105,6 +105,7 @@ MAP_PRECALC:    .res 77
 ; Maintained by the VSYNC interrupt in irq.s, exactly as the X16's VBLANK
 ; handler maintained them.
 IRQ_FRAME:      .res 1          ; ticks elapsed, wraps at 256
+KEY_FAST:       .res 1          ; 0 until the first repeat of a held move key
 KEYTIMER:       .res 1          ; counts down; gates the key repeat
 CLOCK_ACTIVE:   .res 1          ; 1 once the level starts
 CYCLES:         .res 1          ; the game clock, 60 cycles to the second
