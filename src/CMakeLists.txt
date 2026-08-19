@@ -4,6 +4,7 @@ target_sources(robots PRIVATE
     platform.c
     input.c
     psg.c
+    plot.s                    # the tile blitter, in assembly because the profile said so
     # David Murray's game logic, converted from ACME to ca65. These are the
     # original instructions, not a transliteration, so they behave exactly as
     # the X16 build does.

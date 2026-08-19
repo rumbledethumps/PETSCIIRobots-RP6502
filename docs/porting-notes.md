@@ -267,6 +267,75 @@ is level-k's, eight tiles from the start, and the route runs around a bunker and
 through a corridor where a robot stands in the way. Worth coming back to with a
 scripted path, or a test hook that places the player.
 
+## ANIMATE_WATER: rewritten rather than converted
+
+The one routine of David Murray's that could not be converted mechanically.
+Everything it does is machine independent -- it permutes bytes of the tileset
+and sets `REDRAW_WINDOW` -- but it reaches them through the PET's nine
+`TILE_DATA_xx` and nine `TILE_COLOR_xx` arrays, one 256-byte array per cell
+position. This port stores the tileset the other way round, eighteen bytes per
+tile with glyph and colour interleaved and the colour pre-masked, which is what
+makes the blitter six portal writes per row. Structure of arrays into array of
+structures is not something symbol arithmetic can bridge, so the routine is
+re-expressed in `src/platform.c` against `tile_cells`, with the addressing in
+two macros.
+
+Five animations share one twenty-frame timer, as the original runs them: water
+(tiles 204 and 221), the trash compactor (148), the HVAC fans (196, 197, 200,
+201), the cinema marquee (20, 21, 22, scrolling the 197 bytes of
+`CINEMA_MESSAGE`) and the server room light (143). Tile 221 gets five of its
+nine cells updated rather than all nine; that is the original's doing and is
+reproduced rather than tidied.
+
+`tests/emu/animate.txt` walks to the water in level-a and watches one cell come
+back round every third tick, which catches a rotation that runs backwards or
+drops a cell as readily as one that does not run.
+
+## The tile blitter had to be assembly
+
+`PLOT_TILE` was C, and it cost most of a frame.
+
+It surfaced when `ANIMATE_WATER` landed. The original sets `REDRAW_WINDOW` from
+the interrupt every twenty frames so the animations reach the screen, and two
+tests that had been passing started failing on timing. Measured by forcing a
+full window redraw every frame and counting main loop passes against video
+frames:
+
+| | passes per 180 frames |
+|---|---|
+| C blitter, redraw every pass | 95 (1.9 frames per pass) |
+| same with `plot_tile` skipped entirely | 180 (1.0) |
+| same with `MAP_PRE_CALCULATE` skipped | 91 (no change) |
+
+So the whole cost was the blitter and none of it was the precalculation: about
+15 ms of a 16.7 ms frame for a 77-tile window, roughly 1,560 cycles a tile
+against the X16's 219 for the same work. The window redraws on every step the
+player takes, so the game was losing most of a frame per step -- and that was
+true before the animations existed, which merely made it visible.
+
+cc65 spends it on index arithmetic it cannot keep in registers: a 16-bit
+multiply per tile and a pointer increment per byte, reloaded around every store
+because `RIA` is volatile. `src/plot.s` writes the same work out by hand at
+about 280 cycles a tile, which is what this document predicted for the loop
+originally. The redraw now fits inside a frame with room to spare: **180 passes
+per 180 frames even with a full redraw on every one of them**, against 95
+before. It is also 209 bytes smaller than the C.
+
+The interface is a zero-page pair rather than arguments: the caller sets
+`plot_addr` and passes the tile number in A, where fastcall has it anyway, and
+the blitter leaves `plot_addr` alone because the window plots terrain and then
+the unit overlay at the same address.
+
+Both blitters are verified against the tileset rather than by eye.
+`plot_tile` was checked by computing the whole 11x7 window from `level-a` and
+`tiles.bin` and comparing all 1,386 bytes of the character plane -- zero
+mismatches. `plot_transparent_tile` was checked by forcing a known overlay tile
+with four transparent cells over known terrain and confirming each of the nine
+cells resolves the right way. Worth knowing: no shipped test reaches the overlay
+path on its own, because nothing puts a mobile unit inside the window near
+level-a's start -- doors and found objects are written into the map, not drawn
+over it.
+
 ## Sound: the engine the X16 threw away
 
 The RP6502 has a PSG, not a sample player, so the right engine is the original

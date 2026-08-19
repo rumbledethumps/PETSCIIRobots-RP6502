@@ -32,60 +32,140 @@ unsigned char tile_cells[256 * 3 * 6];
  * is why the original keeps two plot routines rather than one with a flag. */
 #define TILE_TRANSPARENT 0x3A
 
-static void plot_tile(unsigned addr, unsigned char tile)
-{
-    const unsigned char *p = &tile_cells[(unsigned)tile * 18];
-    unsigned char row;
-    RIA.step0 = 1;
-    for (row = 0; row < 3; row++) {
-        RIA.addr0 = addr;
-        RIA.rw0 = *p++; RIA.rw0 = *p++;
-        RIA.rw0 = *p++; RIA.rw0 = *p++;
-        RIA.rw0 = *p++; RIA.rw0 = *p++;
-        addr += SCR_STRIDE;
-    }
-}
+/* The blitters live in src/plot.s. They were C; the profile moved them. A full
+ * window is 77 tiles and the C version cost about 15 ms of a 16.7 ms frame,
+ * which the window pays on every step the player takes. plot_addr is a zero
+ * page pair the caller sets first; the tile number goes in A, where fastcall
+ * puts it anyway. */
+extern unsigned plot_addr;
+#pragma zpsym("plot_addr")
+void __fastcall__ plot_tile(unsigned char tile);
+void __fastcall__ plot_transparent_tile(unsigned char tile);
 
-/* The unit overlay. Reading RIA.rw0 advances addr0 by step0 with a correct
- * 16-bit add, so skipping a cell costs two reads and cannot walk off a page
- * the way the X16's double INC of the address low byte would at this stride. */
-static void plot_transparent_tile(unsigned addr, unsigned char tile)
+/* ANIMATE_WATER, from reference/x16/x16Robots.ASM 4419-4560.
+ *
+ * The one piece of the original that could not be converted rather than
+ * rewritten. Everything it does is machine independent -- it only permutes
+ * bytes of the tileset and asks for a redraw -- but it does that through the
+ * PET's nine TILE_DATA_xx and nine TILE_COLOR_xx arrays, each 256 bytes, one
+ * per cell position. This port stores the tileset the other way round: eighteen
+ * bytes per tile, glyph and colour interleaved and the colour pre-masked, which
+ * is what makes plot_tile six portal writes per row. Structure of arrays into
+ * array of structures is not something symbol arithmetic can bridge, so the
+ * routine is re-expressed here against tile_cells and the arithmetic lives in
+ * two macros.
+ *
+ * Five animations share the one twenty-frame timer, exactly as the original
+ * runs them: water, the trash compactor, the HVAC fans, the cinema marquee and
+ * the server room's blinking light.
+ */
+
+/* Cell (row, col) of a tile: row 0 top, col 0 left. TD is the glyph, TC the
+ * colour, which is where the X16 wrote TILE_DATA_xx and TILE_COLOR_xx. */
+#define TD(tile, row, col) tile_cells[(unsigned)(tile) * 18u + (row) * 6u + (col) * 2u]
+#define TC(tile, row, col) tile_cells[(unsigned)(tile) * 18u + (row) * 6u + (col) * 2u + 1u]
+
+/* The X16 declares this as a byte that is one and never assigns it again. Kept
+ * because it is the switch the original offers for turning the animations off. */
+unsigned char ANIMATE = 1;
+
+static unsigned char water_timer, hvac_state, cinema_state;
+
+void plat_animate_water(void)
 {
-    const unsigned char *p = &tile_cells[(unsigned)tile * 18];
-    unsigned char row, col;
-    RIA.step0 = 1;
-    for (row = 0; row < 3; row++) {
-        RIA.addr0 = addr;
-        for (col = 0; col < 3; col++) {
-            if (*p == TILE_TRANSPARENT) {
-                p += 2;
-                (void)RIA.rw0;
-                (void)RIA.rw0;
-            } else {
-                RIA.rw0 = *p++;
-                RIA.rw0 = *p++;
-            }
-        }
-        addr += SCR_STRIDE;
+    unsigned char t;
+
+    if (ANIMATE != 1)
+        return;
+    if (++water_timer != 20)
+        return;
+    water_timer = 0;
+
+    /* Water, tile 204. Three diagonals each rotate one cell down-right, which
+     * is what makes the surface appear to drift. Tile 221 is the same water
+     * under something else and takes the five cells the original gives it --
+     * not all nine, which is the original's business and not a slip to tidy. */
+    t = TD(204, 2, 2);
+    TD(204, 2, 2) = TD(204, 1, 1);  TD(221, 2, 2) = TD(204, 1, 1);
+    TD(204, 1, 1) = TD(204, 0, 0);
+    TD(204, 0, 0) = t;
+
+    t = TD(204, 2, 0);
+    TD(204, 2, 0) = TD(204, 1, 2);  TD(221, 2, 0) = TD(204, 1, 2);
+    TD(204, 1, 2) = TD(204, 0, 1);
+    TD(204, 0, 1) = t;              TD(221, 0, 1) = t;
+
+    t = TD(204, 2, 1);
+    TD(204, 2, 1) = TD(204, 1, 0);  TD(221, 2, 1) = TD(204, 1, 0);
+    TD(204, 1, 0) = TD(204, 0, 2);
+    TD(204, 0, 2) = t;              TD(221, 0, 2) = t;
+
+    /* The trash compactor, tile 148: colours rotate right along each row while
+     * the glyphs stay put, so the crusher looks like it is turning over. */
+    t = TC(148, 0, 2);
+    TC(148, 0, 2) = TC(148, 0, 1);
+    TC(148, 0, 1) = TC(148, 0, 0);
+    TC(148, 0, 0) = t;
+
+    t = TC(148, 1, 2);
+    TC(148, 1, 2) = TC(148, 1, 1);
+    TC(148, 1, 1) = TC(148, 1, 0);
+    TC(148, 1, 0) = t;
+
+    t = TC(148, 2, 2);
+    TC(148, 2, 2) = TC(148, 2, 1);
+    TC(148, 2, 1) = TC(148, 2, 0);
+    TC(148, 2, 0) = t;
+
+    /* The HVAC fans, tiles 196, 197, 200 and 201: two frames, swapped. */
+    if (hvac_state) {
+        TD(196, 1, 1) = 0xCD;  TD(201, 0, 0) = 0xCD;
+        TD(197, 1, 0) = 0xCE;  TD(200, 0, 1) = 0xCE;
+        TD(196, 1, 2) = 0xA0;  TD(196, 2, 1) = 0xA0;
+        TD(197, 2, 0) = 0xA0;  TD(200, 0, 2) = 0xA0;
+        hvac_state = 0;
+    } else {
+        TD(196, 1, 1) = 0xA0;  TD(201, 0, 0) = 0xA0;
+        TD(197, 1, 0) = 0xA0;  TD(200, 0, 1) = 0xA0;
+        TD(196, 1, 2) = 0xC2;  TD(200, 0, 2) = 0xC2;
+        TD(196, 2, 1) = 0xC0;  TD(197, 2, 0) = 0xC0;
+        hvac_state = 1;
     }
+
+    /* The cinema marquee: six cells across tiles 20, 21 and 22 shift one to the
+     * left and the next character of CINEMA_MESSAGE arrives at the right. */
+    TD(20, 1, 1) = TD(20, 1, 2);
+    TD(20, 1, 2) = TD(21, 1, 0);
+    TD(21, 1, 0) = TD(21, 1, 1);
+    TD(21, 1, 1) = TD(21, 1, 2);
+    TD(21, 1, 2) = TD(22, 1, 0);
+    TD(22, 1, 0) = CINEMA_MESSAGE[cinema_state];
+
+    if (++cinema_state == 197)
+        cinema_state = 0;
+
+    /* The server room light, tile 143, alternating between two glyphs. */
+    TD(143, 1, 2) = (unsigned char)(TD(143, 1, 2) == 0xD7 ? 0xD1 : 0xD7);
+
+    REDRAW_WINDOW = 1;
 }
 
 void plat_draw_map_window(void)
 {
     unsigned char tx, ty, n = 0;
-    unsigned addr;
 
     MAP_PRE_CALCULATE();
     REDRAW_WINDOW = 0;
 
     for (ty = 0; ty < MAP_WIN_TILES_H; ty++) {
         for (tx = 0; tx < MAP_WIN_TILES_W; tx++, n++) {
-            addr = CELL(MAP_WIN_COL + tx * 3, MAP_WIN_ROW + ty * 3);
-            plot_tile(addr, MAP[((unsigned)(MAP_WINDOW_Y + ty) << 7)
-                                + MAP_WINDOW_X + tx]);
-            /* A unit standing here draws over the terrain. */
+            plot_addr = CELL(MAP_WIN_COL + tx * 3, MAP_WIN_ROW + ty * 3);
+            plot_tile(MAP[((unsigned)(MAP_WINDOW_Y + ty) << 7)
+                          + MAP_WINDOW_X + tx]);
+            /* A unit standing here draws over the terrain, at the same
+             * address -- which is why the blitter leaves plot_addr alone. */
             if (MAP_PRECALC[n])
-                plot_transparent_tile(addr, MAP_PRECALC[n]);
+                plot_transparent_tile(MAP_PRECALC[n]);
         }
     }
 }

@@ -1,0 +1,86 @@
+# The tileset animations: ANIMATE_WATER, from the VSYNC interrupt.
+#
+# Five animations share one twenty-frame timer -- water, the trash compactor,
+# the HVAC fans, the cinema marquee and the server room light -- and all of them
+# work by permuting bytes of the tileset and setting REDRAW_WINDOW, so the map
+# window redraws them wherever they happen to be on screen.
+#
+# The original does this through nine TILE_DATA_xx arrays of 256 bytes, one per
+# cell position. This port stores eighteen bytes per tile instead, glyph and
+# colour interleaved, which is what makes plot_tile six portal writes per row --
+# so the routine is re-expressed against that layout in src/platform.c rather
+# than converted like the rest of the game. This test is what says the
+# re-expression is right.
+#
+# level-a starts the player at 22,38 with water twelve squares to his left.
+# Walking there puts tile 204 in the window; cell (3,2) of the character plane
+# is one of its cells, at XR_CHARS + 2*80 + 3*2 = $96A6, two bytes per cell.
+
+wait "MENU"
+run 30
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 60
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+press j
+run 8
+release j
+run 6
+run 40
+
+# Water rotates three cells along a diagonal, so the glyphs at any one cell come
+# back round every third tick. Three ticks of twenty frames, then equality with
+# where it started -- which catches a rotation that runs backwards or drops a
+# cell as readily as one that does not run at all.
+peek xram:$96A6 $4B $0E $55 $06 $4B $06
+run 20
+peek xram:$96A6 $55 $0E $4B $06 $4B $06
+run 20
+peek xram:$96A6 $4B $0E $55 $06 $55 $06
+run 20
+peek xram:$96A6 $4B $0E $55 $06 $4B $06

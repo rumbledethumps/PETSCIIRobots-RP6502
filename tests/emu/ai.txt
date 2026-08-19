@@ -36,17 +36,24 @@ peek xram:$FE0C $9F $4F $00
 # Health is untouched at 12: nothing has reached the player yet.
 peek xram:$FE06 $0C
 
-# Walk right and then up. He gets twelve squares across the open ground and
-# three up before tile 67 stops him -- see-through but not walkable, which is
-# the wall of the building north of the start.
+# Walk right and then up, each leg held long enough to reach a wall rather than
+# long enough for a fixed number of key repeats. The old form pressed for 120
+# frames and checked where he had got to, which measured the frame rate as much
+# as the collision -- it changed the moment the tile blitter got faster. A stop
+# is a property of the map and does not.
+#
+# Right until he stops: tile 47 at 46,38 blocks him at x=45. Then up until he
+# stops: tile 5 at 45,24 blocks him at y=25. Both are open ground the whole way
+# there, tile 9.
 press l
-run 120
+run 400
 release l
-run 4
+run 10
+peek xram:$FE04 $2D $26
 press i
-run 200
+run 400
 release i
-run 20
-peek xram:$FE04 $22 $23
+run 10
+peek xram:$FE04 $2D $19
 
 shot "ai.png"

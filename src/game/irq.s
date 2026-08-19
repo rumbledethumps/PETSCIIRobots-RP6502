@@ -46,6 +46,7 @@
 XR_CFG_CHARS = $E0A0
 
         .export _petscii_irq
+        .import _plat_animate_water
 
         .segment "CODE"
 
@@ -71,6 +72,10 @@ _petscii_irq:
 
 @clock:
         jsr     UPDATE_GAME_CLOCK
+        ; The tileset animations, where RUNIRQ calls them. They only permute
+        ; bytes of tile_cells in RAM and set REDRAW_WINDOW, so they need no
+        ; portal and sit outside VBLANK_VIDEO's save.
+        jsr     _plat_animate_water
         jsr     VBLANK_VIDEO
         lda     #1                      ; IRQ_HANDLED
         rts
