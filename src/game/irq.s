@@ -46,7 +46,7 @@
 XR_CFG_CHARS = $E0A0
 
         .export _petscii_irq
-        .import _plat_animate_water, _plat_flash_step
+        .import _plat_animate_water, _plat_flash_step, _plat_input_poll
 
         .segment "CODE"
 
@@ -128,6 +128,12 @@ VBLANK_VIDEO:
         ; in vblank because a palette entry changed part way down a frame shows
         ; as a band across the picture.
         jsr     _plat_flash_step
+
+        ; The keyboard scan, where the KERNAL's own scan ran: in the interrupt.
+        ; A press is an edge and only whoever is looking when it happens sees
+        ; it, so scanning from the main loop drops taps that start and finish
+        ; inside one pass. Reads XRAM through this portal, hence inside the save.
+        jsr     _plat_input_poll
 
         ; One tick of the sound engine, where the PET calls it. Its only output
         ; is through the platform layer's PSG writes, which use this portal, so

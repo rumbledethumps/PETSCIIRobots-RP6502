@@ -56,13 +56,24 @@ def main():
     ap.add_argument('x', type=int)
     ap.add_argument('y', type=int)
     ap.add_argument('--rom', default='build/cc65/release/src/robots.rp6502')
-    ap.add_argument('--emu', default='tools/rp6502-emu')
+    ap.add_argument('--emu', default=None,
+                    help='default: tools/rp6502-emu, or the .exe beside it')
+    ap.add_argument('--keys', action='store_true',
+                    help='route through locked doors too, for a run that pokes '
+                         'KEYS to say the player found them')
+    ap.add_argument('--poke', action='append', default=[],
+                    help='"[xram:|ram:]<addr> <byte>..." written once the level '
+                         'is up, repeatable. Some states no sequence of keys '
+                         'reaches -- the endgame wants every robot dead -- and '
+                         'writing them is how a route gets to the part under '
+                         'test.')
     ap.add_argument('--seed', default='1')
     ap.add_argument('--max-steps', type=int, default=600)
     a = ap.parse_args()
 
     att, T, X, Y, C, MAP = load(a.level)
-    doors = {(X[i], Y[i]) for i in range(64) if T[i] == DOOR and C[i] == 0}
+    doors = {(X[i], Y[i]) for i in range(64)
+             if T[i] == DOOR and (a.keys or C[i] == 0)}
     target = (a.x, a.y)
 
     def walkable(x, y):
@@ -94,7 +105,17 @@ def main():
             out.append(k)
         return out[::-1]
 
-    p = subprocess.Popen([a.emu, '--mute', '--seed', a.seed, '--tmpdrive',
+    emu = a.emu
+    if emu is None:
+        for cand in ('tools/rp6502-emu', 'tools/rp6502-emu.exe'):
+            if (ROOT / cand).exists():
+                emu = str(ROOT / cand)
+                break
+        else:
+            print('no rp6502-emu in tools/', file=sys.stderr)
+            return 1
+
+    p = subprocess.Popen([emu, '--mute', '--seed', a.seed, '--tmpdrive',
                           '--script', '-', a.rom],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          text=True, bufsize=1)
@@ -127,6 +148,10 @@ def main():
     send('press i', 'run 6', 'release i', 'run 10')
     send('press space', 'run 6', 'release space')
     send('wait "BRINGUP OK"', 'run 20')
+    for line in a.poke:
+        send(f'poke {line}')
+    if a.poke:
+        send('run 60')          # let the AI notice the state it was handed
 
     pos, stuck, status = None, 0, 'ran out of steps'
     for _ in range(a.max_steps):

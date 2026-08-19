@@ -77,10 +77,10 @@ run 40
 # back round every third tick. Three ticks of twenty frames, then equality with
 # where it started -- which catches a rotation that runs backwards or drops a
 # cell as readily as one that does not run at all.
-peek xram:$96A6 $4B $0E $55 $06 $4B $06
-run 20
 peek xram:$96A6 $55 $0E $4B $06 $4B $06
 run 20
 peek xram:$96A6 $4B $0E $55 $06 $55 $06
 run 20
 peek xram:$96A6 $4B $0E $55 $06 $4B $06
+run 20
+peek xram:$96A6 $55 $0E $4B $06 $4B $06

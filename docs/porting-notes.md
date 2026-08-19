@@ -393,20 +393,50 @@ deterministic under a fixed seed, so a recorded route is a normal test until the
 game's timing changes -- and when it does, regenerating is one command rather
 than an afternoon. `tests/emu/flash.txt` is the first test built this way.
 
-### What it still cannot reach, and why
+### Reaching states no route can: poke
 
-**The win screens.** `TRANSPORTER_PAD` only makes itself active once every unit
-in slots 1 to 27 is dead; until then standing on it does nothing. Winning is
-therefore a full combat playthrough -- find weapons, find ammunition, clear
-twenty-odd robots -- not a route. Surveying all fourteen levels for a pad
-reachable without keys found exactly one, level-h's at 21,25, and driving to it
-confirms the pad ignores a player who has not cleared the level. So
-`plat_game_over`'s win path and the endgame statistics screen stay verified by
-hand only.
+`rp6502-emu` grew a `poke` command, which writes memory the program then reads.
+That is how the last three gaps closed, and each writes only the state the game
+would have arrived at by itself:
 
-**Game over.** The same in reverse: the player has to be killed, and the hazards
-a route can reach stop hurting him well before zero. Level-e's rollerbot takes
-twelve health down to one and then loses interest.
+* **The endgame.** `TRANSPORTER_PAD` activates only once every unit in slots 1
+  to 27 is dead, so winning is a full combat playthrough and no route reaches
+  it. `tests/emu/endgame.txt` writes zero over `UNIT_TYPE[1..27]` and the pad's
+  own AI clears `UNIT_A` on its next pass, exactly as it would after a real
+  fight. The player still walks to the pad and `DEMATERIALIZE` still runs its 48
+  frames.
+* **Game over.** The hazards a route can reach stop short of killing him --
+  level-e's rollerbot takes twelve health to one and loses interest.
+  `tests/emu/gameover.txt` pokes health to 1 on level-k, three squares from an
+  evilbot, and the game kills him through its own `INFLICT_DAMAGE`.
+* **The elevator panel.** Written in M6 and never tested, because all thirty
+  elevators in the fourteen levels are behind locked doors and the shafts are
+  not walkable. `tests/emu/elevator.txt` pokes the player to the square
+  `ELEVATOR_PANEL` looks for -- the elevator's column, one row above it -- and
+  drives the panel from there.
+
+`poke` is newer than the emulator CI fetches, so `petscii_add_emu_test` takes
+`NEEDS_POKE` and `cmake/EmuTest.cmake` probes for it at configure time. Those
+tests are simply not registered where it is missing, and appear on their own
+once CI catches up.
+
+### The emulator does not deliver an exact number of frames
+
+Worth knowing before writing any test that reads a value at a fixed offset: the
+same script, the same ROM and the same `--seed` do not produce the same tick
+count. Measured by booting, running 600 frames and reading the game's own VSYNC
+counter: **143 ticks on some runs and 144 on others**, and the main loop's pass
+counter follows it. The game is deterministic given a tick sequence; the tick
+sequence is not.
+
+So a check must not depend on exactly when it is read. `tests/emu/flash.txt`
+originally read the border ramp at fixed offsets and failed about one run in
+three; it now writes the countdown itself and reads a value the ramp holds for
+two consecutive frames, which is stable. Positions after a *held* key are the
+other sensitive kind -- routes that press and release once per step are not,
+which is why the recorded playthroughs survive.
+
+### What still cannot be reached, and why
 
 **Locked doors.** `UNIT_C` on a door is 0, or 1, 2, 3 for the spade, heart and
 star keys, and `AI_DOOR` will not open a locked one without the key in `KEYS`.

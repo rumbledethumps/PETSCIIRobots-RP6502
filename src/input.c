@@ -10,12 +10,25 @@
  * while the key with HID code N is down. So this file does three things GETIN
  * did for free -- translate, detect the press rather than the hold, and repeat.
  *
- * Polling happens inside plat_getin, once per frame, rather than from a game
- * loop. Reading the bit array means reading XRAM through a portal, which the
- * interrupt handler must not do, and the game asks for keys from places that
- * are not the main loop -- USER_SELECT_OBJECT drives its own loop while the
- * selection cursor is up. Keying the poll off the interrupt's frame counter
- * makes it correct wherever it is called from.
+ * SCANNING BELONGS IN THE INTERRUPT, which is where the KERNAL does it. That is
+ * not a detail: a press is an edge, and an edge is only seen by whoever is
+ * looking when it happens. Polling from the main loop instead loses a tap that
+ * begins and ends inside one loop pass -- and a pass is not always one frame,
+ * since a full window redraw can overrun -- and it also lets the press and the
+ * repeat land in the same pass, which queues the key twice. Both were real:
+ * brief taps moved two tiles at some phases of the repeat timer and none at
+ * others, depending on where the tap fell relative to the loop.
+ *
+ * So plat_input_poll runs from the VSYNC handler, once per frame, exactly as
+ * the KERNAL's own keyboard scan ran from its IRQ, and fills a queue that
+ * plat_getin drains. That makes the queue a single producer, single consumer
+ * ring: the interrupt only ever advances q_tail and the game only ever advances
+ * q_head, each a single byte store, so neither needs to lock the other out.
+ * plat_clear_key_buffer moves both and does.
+ *
+ * It reads XRAM through portal 1, which is the one src/game/irq.s saves and
+ * restores around everything it does, so the main loop's portal 0 work is
+ * untouched.
  */
 #include <rp6502.h>
 
@@ -98,8 +111,6 @@ static void push(unsigned char code)
     }
 }
 
-static unsigned char polled_frame;
-
 void input_init(void)
 {
     unsigned char i;
@@ -107,20 +118,19 @@ void input_init(void)
         before[i] = 0;
     q_head = q_tail = held_n = 0;
     xreg_ria_keyboard(XR_KEYBOARD);
-    polled_frame = IRQ_FRAME;
 }
 
-/* Queues a code for every key that went down since the last call, and keeps the
- * held set up to date. Repeats are not this routine's business; see
- * plat_key_repeat. */
-static void input_poll(void)
+/* One keyboard scan, from the VSYNC interrupt. Queues a code for every key that
+ * went down since the last frame and keeps the held set up to date. Repeats are
+ * not this routine's business; see plat_key_repeat. */
+void plat_input_poll(void)
 {
     unsigned char i, j, b, hid, code;
 
-    RIA.addr0 = XR_KEYBOARD;
-    RIA.step0 = 1;
+    RIA.addr1 = XR_KEYBOARD;
+    RIA.step1 = 1;
     for (i = 0; i < 32; i++)
-        now[i] = RIA.rw0;
+        now[i] = RIA.rw1;
 
     for (i = 0; i < 32; i++) {
         b = (unsigned char)(now[i] & ~before[i]);        /* newly pressed */
@@ -162,10 +172,6 @@ static void input_poll(void)
 unsigned char plat_getin(void)
 {
     unsigned char code;
-    if (polled_frame != IRQ_FRAME) {
-        polled_frame = IRQ_FRAME;
-        input_poll();
-    }
     if (q_head == q_tail)
         return 0;
     code = queue[q_head];
@@ -175,7 +181,10 @@ unsigned char plat_getin(void)
 
 void plat_clear_key_buffer(void)
 {
+    /* Both ends at once, so the interrupt must not be part way through a scan. */
+    __asm__("sei");
     q_head = q_tail = 0;
+    __asm__("cli");
 }
 
 /* KEY_REPEAT, from x16Robots.ASM 1988. The main game loop calls this before
@@ -196,10 +205,8 @@ void plat_clear_key_buffer(void)
  */
 void plat_key_repeat(void)
 {
-    if (polled_frame != IRQ_FRAME) {
-        polled_frame = IRQ_FRAME;
-        input_poll();
-    }
+    if (q_head != q_tail)
+        return;                         /* a real press is already waiting */
     if (KEYTIMER)
         return;
     if (!held_n) {

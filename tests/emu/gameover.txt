@@ -1,0 +1,181 @@
+# Dying, and the screens that follow.
+#
+# plat_game_over has two branches and only one of them had ever run under test.
+# On a death it faces the player's sprite FACE_DEAD, holds for 100 frames while
+# BACKGROUND_TASKS keeps running, then shows the box, the endgame statistics and
+# LOS_MSG; on a win it skips straight to the box. tests/emu/endgame.txt covers
+# the win.
+#
+# Getting killed is harder than it sounds. The hazards a route can reach stop
+# well short: level-e's rollerbot takes twelve health down to one and loses
+# interest. level-k has an evilbot at 9,5, three squares from the player's
+# start, and poking health down to 1 first makes the first hit fatal -- the game
+# still kills him through its own INFLICT_DAMAGE, which is the path worth
+# exercising.
+#
+# The route was recorded by
+#     tools/playthrough.py k 9 5 --keys --poke "$776C $07" --poke "$79C0 $01"
+# RAM addresses from build/.../robots.map: KEYS $776C, UNIT_HEALTH $79C0. The
+# keys are poked because level-k's route passes a locked door; without them the
+# driver walks around and never meets the evilbot.
+wait "MENU"
+run 30
+press k
+run 6
+release k
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press i
+run 6
+release i
+run 10
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 20
+poke $776C $07
+poke $79C0 $01
+run 60
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+run 60
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+run 60
+press i
+run 8
+release i
+run 8
+press i
+run 8
+release i
+run 8
+
+# Killed: the AI signals it by putting the player's own unit type back to 0,
+# which the probe reports as state 3. A win would be 4.
+run 250
+peek xram:$FE02 $03
+
+# Then the death pose and its wait, the game-over box, the statistics, and back
+# to the intro. Reaching the menu is the assertion that all of it ran; each of
+# those screens waits for a key, so a hang in any of them times out here.
+press space
+run 8
+release space
+run 150
+press space
+run 8
+release space
+run 150
+press space
+run 8
+release space
+wait "MENU" 500

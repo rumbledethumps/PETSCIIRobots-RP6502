@@ -1,0 +1,263 @@
+# Winning a level, and the screens that follow.
+#
+# TRANSPORTER_PAD only makes itself active once every unit in slots 1 to 27 is
+# dead, so winning is a full combat playthrough -- find weapons, find ammunition,
+# clear twenty-odd robots -- and no route can reach it. That left plat_game_over
+# and the endgame statistics with no coverage at all.
+#
+# poke closes it: write the state the game would have reached and let it read it
+# back. UNIT_TYPE[1..27] at $7801 goes to zero -- every robot dead -- and the
+# pad's own AI notices on its next pass and clears UNIT_A, exactly as it would
+# have after a real fight. Nothing else is faked; the player still walks to the
+# pad and DEMATERIALIZE still runs its 48 frames.
+#
+# level-h because its exit pad at 21,25 is the only one in fourteen levels
+# reachable without keys. The route was recorded by
+#     tools/playthrough.py h 21 25 --poke "$7801 $00 x27"
+# which drives the emulator a step at a time and re-plans from where the player
+# actually is; replayed open loop it is deterministic under --seed 1.
+#
+# RAM addresses come from build/.../robots.map and move when the code above them
+# changes size. If this test starts failing at the poke, check them there first.
+wait "MENU"
+run 30
+press k
+run 6
+release k
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press i
+run 6
+release i
+run 10
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 20
+poke $7801 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+run 60
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press l
+run 8
+release l
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press k
+run 8
+release k
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press j
+run 8
+release j
+run 8
+press i
+run 8
+release i
+run 8
+
+# DEMATERIALIZE finishes and sets the player's own type to 2, which is how the
+# AI signals a win -- 0 is how it signals a death. The main loop sees it and
+# goes to plat_game_over, which does not return until a key is pressed, so the
+# probe stops being refreshed here and there is nothing to peek at yet.
+run 300
+
+# The game-over box, then the statistics screen, then back to the intro.
+press space
+run 8
+release space
+run 120
+press space
+run 8
+release space
+run 120
+press space
+run 8
+release space
+wait "MENU" 400
+
+# Back at the menu with the win still recorded: state 4 is WON, 3 would be DEAD.
+# Reaching the menu at all is the assertion that the whole sequence ran --
+# game-over box, endgame statistics, and the wait for a key on each.
+peek xram:$FE02 $04

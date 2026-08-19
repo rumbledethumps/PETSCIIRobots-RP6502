@@ -138,7 +138,12 @@ void update_probe(void)
     RIA.step0 = 1;
     RIA.rw0 = PROBE_MAGIC_0;
     RIA.rw0 = PROBE_MAGIC_1;
-    RIA.rw0 = UNIT_TYPE[0] == 1 ? PROBE_STATE_PLAYING : PROBE_STATE_DEAD;
+    /* The AI signals both endings by changing the player's own type: 0 when he
+     * is killed, 2 when DEMATERIALIZE finishes and the level is won. Reporting
+     * both as "dead" made a win indistinguishable from a death to a test. */
+    RIA.rw0 = UNIT_TYPE[0] == 1 ? PROBE_STATE_PLAYING
+            : UNIT_TYPE[0] == 0 ? PROBE_STATE_DEAD
+                                : PROBE_STATE_WON;
     RIA.rw0 = SELECTED_MAP;         /* 0..13, which level is loaded */
     RIA.rw0 = UNIT_LOC_X[0];
     RIA.rw0 = UNIT_LOC_Y[0];

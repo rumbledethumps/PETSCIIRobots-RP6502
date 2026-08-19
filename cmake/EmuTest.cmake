@@ -19,7 +19,28 @@ if(NOT RP6502_EMU)
         "    cmake -P ${CMAKE_SOURCE_DIR}/tools/rp6502.cmake")
 endif()
 
-# petscii_add_emu_test(<name> ROM <path> [TIMEOUT <s>] [SEED <n>])
+# Does this emulator have `poke`? Some tests reach states that no sequence of
+# keys does -- the endgame needs every robot dead, the elevator panel is behind
+# a locked door -- and the way to those is to write the state and let the game
+# read it back. `poke` is newer than the emulator CI currently fetches, so the
+# tests that need it are registered only where it exists rather than failing
+# everywhere it does not. They light up on their own once CI catches up.
+if(RP6502_EMU AND NOT DEFINED RP6502_EMU_HAS_POKE)
+    set(_probe ${CMAKE_CURRENT_BINARY_DIR}/poke-probe.txt)
+    file(WRITE ${_probe} "poke $0002 $00\n")
+    execute_process(COMMAND ${RP6502_EMU} --mute --seed 1 --tmpdrive
+                            --script ${_probe} ${PETSCII_ROM}
+                    RESULT_VARIABLE _rc OUTPUT_QUIET ERROR_QUIET)
+    if(_rc EQUAL 0)
+        set(RP6502_EMU_HAS_POKE ON CACHE INTERNAL "emulator supports poke")
+        message(STATUS "rp6502-emu supports poke")
+    else()
+        set(RP6502_EMU_HAS_POKE OFF CACHE INTERNAL "emulator supports poke")
+        message(STATUS "rp6502-emu has no poke; skipping the tests that need it")
+    endif()
+endif()
+
+# petscii_add_emu_test(<name> ROM <path> [TIMEOUT <s>] [SEED <n>] [NEEDS_POKE])
 #
 # --mute so CI opens no audio device, --seed so anything asking for entropy gets
 # the same entropy every run, --tmpdrive so MSC0: is a fresh throwaway and a
@@ -27,8 +48,11 @@ endif()
 # --script: it drives sys_run_frame() itself and never opens a window, so no X
 # server is involved. A failed check names the script line and exits 1.
 function(petscii_add_emu_test name)
-    cmake_parse_arguments(E "" "ROM;TIMEOUT;SEED" "" ${ARGN})
+    cmake_parse_arguments(E "NEEDS_POKE" "ROM;TIMEOUT;SEED" "" ${ARGN})
     if(NOT RP6502_EMU)
+        return()
+    endif()
+    if(E_NEEDS_POKE AND NOT RP6502_EMU_HAS_POKE)
         return()
     endif()
     if(NOT E_SEED)

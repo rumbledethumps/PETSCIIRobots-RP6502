@@ -893,8 +893,11 @@ void plat_elevator_select(void)
     RIA.step0 = 1;
     elevator_invert(ELEV_SELECTED);
 
+    /* ELS5 is a tight poll -- no BACKGROUND_TASKS -- so the world holds still
+     * while a floor is being chosen. This used to run the AI round this loop,
+     * which let robots move and shoot while the panel was up. The keyboard is
+     * scanned by the interrupt now, so waiting here costs nothing. */
     for (;;) {
-        BACKGROUND_TASKS();
         key = plat_getin();
         if (!key)
             continue;

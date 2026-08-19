@@ -12,6 +12,9 @@
 # actually is. Replayed open loop it is deterministic under --seed 1.
 #
 # Regenerate with:  tools/playthrough.py e 75 42
+#
+# BORDER's RAM address ($60CF) comes from build/.../robots.map and moves when the
+# code above it changes size. If this fails at the poke, look there first.
 wait "MENU"
 run 30
 press k
@@ -148,21 +151,30 @@ run 8
 peek xram:$FE04 $4B $2A
 peek xram:$FE06 $0C
 
-# One hit: health down one, and entry 0 part way up the red ramp. The ramp is
-# 8, 15, 25, 31 and back, in the five bits RGB555 gives red -- the X16 saw 8,
-# 15, 9, 15 because VERA reads only four of them.
-run 12
-peek xram:$FE06 $0B
-peek xram:$E000 $39 $00
+# It hurts him repeatedly, which is what sets BORDER: INFLICT_DAMAGE writes 10
+# there whenever the unit it hurts is the player. Health settles at 1 and the
+# hazard loses interest, so this is a plateau rather than a moment.
+run 200
+peek xram:$FE06 $01
 
-# Still being hit, and at the top of the ramp.
-run 36
-peek xram:$FE06 $07
+# The ramp itself is checked by driving it rather than by catching it, because
+# the emulator does not deliver an exact number of frames per `run` -- the same
+# script gives 143 or 144 VSYNC ticks -- and a ten-frame ramp read at a fixed
+# offset lands on a different step each time. Writing the countdown instead
+# makes the check independent of when the last hit landed.
+#
+# Index 6 of the ramp is 31, and so is index 5, so this reads the same whether
+# one tick or two have gone by. Red occupies the low five bits of the RGB555
+# entry and bit 5 is the opacity flag: $3F is full red, opaque.
+poke $60CF $06
+run 1
+peek xram:$E000 $3F $00
+run 1
 peek xram:$E000 $3F $00
 
-# The hazard stops and entry 0 goes back to opaque black -- the opacity bit set,
-# every colour component zero. Leaving it tinted would darken or stain the whole
-# playfield for the rest of the game.
-run 24
-peek xram:$FE06 $06
+# The countdown reaching zero is what says the interrupt walked it, and entry 0
+# going back to opaque black is what says it cleaned up. Leaving it tinted would
+# stain the whole playfield for the rest of the game.
+run 40
+peek $60CF $00
 peek xram:$E000 $20 $00
