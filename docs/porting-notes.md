@@ -338,6 +338,55 @@ the map rather than drawn over it. Level-g starts with a robot already in view,
 so it reaches the path on the first frame -- and getting there drives the intro
 menu's map option, which nothing else did either.
 
+## Gamepads
+
+`plat_gamepad_read` was an empty function, so choosing CONTROLLER on the intro
+menu gave a game that ignored you -- and the ported assembly was already calling
+into it, since `items.s` reads the pad from `MOVE_OBJECT` and
+`USER_SELECT_OBJECT`.
+
+The X16 asks the KERNAL for a joystick word and unpacks it into twelve latches:
+B, Y, SELECT, START, UP, DOWN, LEFT, RIGHT, A, X, L, R. A press sets one and
+whatever acts on it clears it. The RIA keeps the same facts in XRAM, updated
+continuously, so the read is four bytes of the player-one block rather than a
+call: DPAD holds the directions and a connected flag, STICKS both sticks reduced
+to direction bits, BTN0 the face and shoulder buttons, BTN1 select and start.
+
+**Face buttons are mapped by position, not by name.** The original fires in the
+direction of the button under your thumb -- SNES Y is the left button and fires
+left, A is the right one, X the top, B the bottom. The RIA reports buttons by
+label, and a label sits somewhere different depending on the pad: DPAD bits 4-5
+say which convention this one uses, and an Eastern BA pad has A and B the other
+way round from a Western AB one. Mapping by name would fire left when you press
+the top button on half the pads in the world.
+
+**Both sticks are merged in.** The left stick joins the d-pad and the right
+stick joins the face buttons where each points, so the pad is twin-stick and
+nothing above the read knows: the twelve latches are still the twelve the X16
+unpacked, and `SC01`-`SC75` is the original's dispatch unchanged -- directions
+gated on `KEYTIMER`, buttons not, SELECT acting as a shift key that turns left
+into the map, L into cycle-item and R into cycle-weapon.
+
+One bug worth recording, because it looked like a hardware problem and was a
+compiler one. The first version skipped the STICKS byte with `(void)RIA.rw0;`,
+relying on the read to advance the portal. A read whose value is discarded is
+exactly the kind a compiler may drop, and cc65 dropped it -- so `btn0` received
+the stick bits and `btn1` received `btn0`. The d-pad worked, because DPAD is
+read first, and no button ever did. All four bytes are used now.
+
+While implementing it: `PAUSE_GAME` had never been ported either. `MSG_PAUSED`
+was sitting in the converted messages with nothing reading it, and run/stop did
+nothing on the keyboard as well as on the pad. It stops the clock, offers to
+quit, and waits in a tight poll with no `BACKGROUND_TASKS` -- so the world
+really stops, which it can now that the keyboard is scanned by the interrupt.
+`CLEAR_KEY_BUFFER` also sets `KEYTIMER` to 20 in the original and did not here,
+which meant a key still held arrived immediately as a fresh press, which is the
+one thing the routine exists to prevent.
+
+`tests/emu/gamepad.txt` covers the d-pad, both sticks, L1 into `SEARCH_OBJECT`
+and the direction that answers it through `SMV30`, and two face buttons firing
+in the directions they sit in.
+
 ## Key repeat: the original has one, and I had not used it
 
 Reported as "controls suck ass: press down, press right, release right and you

@@ -1,0 +1,122 @@
+# The gamepad, which was a stub until now.
+#
+# plat_gamepad_read was an empty function, so choosing CONTROLLER on the intro
+# menu gave you a game that ignored you. The original reads a SNES pad through
+# the KERNAL and unpacks it into twelve latches -- B, Y, SELECT, START, UP,
+# DOWN, LEFT, RIGHT, A, X, L, R -- which the ported assembly reads directly:
+# items.s calls SNES_CONTROLER_READ from MOVE_OBJECT and USER_SELECT_OBJECT.
+# The RIA keeps the same facts in XRAM, so the read is four bytes of the
+# player-one block.
+#
+# FACE BUTTONS ARE MAPPED BY POSITION. The original fires in the direction of
+# the button under your thumb: SNES Y is the left button and fires left, A is
+# the right one, X the top, B the bottom. The RIA reports buttons by label and
+# a label sits somewhere different on each convention, so DPAD bits 4-5 pick the
+# positions. This test connects an "eastern" pad, where B is the bottom button.
+#
+# Both sticks are merged in as well: the RIA reduces each to four direction bits
+# in STICKS, so the left one joins the d-pad and the right one joins the face
+# buttons where each points, which makes the pad twin-stick without the game
+# knowing anything changed.
+
+pad 0 connect eastern sticks
+wait "MENU"
+run 30
+
+# Down three to CONTROLLER, space twice for CONTROL 2, back up, start.
+press k
+run 6
+release k
+run 10
+press k
+run 6
+release k
+run 10
+press k
+run 6
+release k
+run 10
+press space
+run 6
+release space
+run 10
+press space
+run 6
+release space
+run 10
+press i
+run 6
+release i
+run 10
+press i
+run 6
+release i
+run 10
+press i
+run 6
+release i
+run 10
+press space
+run 6
+release space
+wait "BRINGUP OK"
+wait "AI60"
+
+# 2 is the gamepad; the X16 tests CONTROL against it in five places.
+peek @CONTROL@ $02
+
+# The d-pad walks. One short press is one square, because the repeat is paced by
+# KEYTIMER the way AFTER_MOVE_SNES sets it -- 15 frames before the first repeat
+# and 6 after, which is a frame faster than the keyboard's.
+pad 0 press left
+run 8
+pad 0 release left
+run 20
+peek xram:$FE04 $15 $26
+
+# L1 searches, and the direction that answers "which square" goes through
+# USER_SELECT_OBJECT's own pad path -- SMV30 in items.s, converted assembly
+# reading the same latches. Finding the pistol selects it: probe byte 15 packs
+# the weapon in the low nibble.
+pad 0 press l1
+run 8
+pad 0 release l1
+run 20
+pad 0 press up
+run 8
+pad 0 release up
+run 240
+peek xram:$FE0F $01
+
+# The pistol comes with a hundred rounds. B is the bottom button on this pad and
+# fires down; Y is the left one and fires left. If the face buttons were mapped
+# by name instead of position these would fire the wrong way, and if the button
+# byte were misread they would not fire at all -- which is what happened when a
+# discarded read of the STICKS byte was optimised away and handed btn0 the stick
+# bits instead.
+peek @AMMO_PISTOL@ $64
+pad 0 press b
+run 10
+pad 0 release b
+run 40
+peek @AMMO_PISTOL@ $63
+pad 0 press y
+run 10
+pad 0 release y
+run 40
+peek @AMMO_PISTOL@ $62
+
+# The left stick walks, the same as the d-pad.
+pad 0 stick 120 0 0 0
+run 60
+pad 0 stick 0 0 0 0
+run 20
+peek xram:$FE04 $1E $26
+
+# The right stick fires, the same as the face buttons, in the direction it
+# points: pushed left it is the left button, so a round goes left.
+pad 0 stick 0 0 -120 0
+run 10
+pad 0 stick 0 0 0 0
+run 40
+peek @AMMO_PISTOL@ $61

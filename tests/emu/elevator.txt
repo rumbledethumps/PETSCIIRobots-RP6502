@@ -10,8 +10,11 @@
 # level-e's elevator slot 41 is at 52,24 with four floors and the car on floor
 # 1, so the player goes to 52,23.
 #
-# RAM addresses come from build/.../robots.map: UNIT_LOC_X $7840, UNIT_LOC_Y
-# $7880. The panel is drawn at character row 29 from column 7, which is
+# @SYMBOL@ is a RAM address resolved from the linker map when the tests are
+# generated, because RAM symbols move whenever the code above them changes
+# size. XRAM addresses stay literal -- the program picks those, in src/xram.h.
+#
+# The panel is drawn at character row 29 from column 7, which is
 # XR_CHARS + 29*80 + 7*2 = $9F1E, two bytes per cell.
 
 wait "MENU"
@@ -48,8 +51,8 @@ run 20
 
 # Stand him at 52,23. The nudge down and back up is what makes the game redraw
 # the window around him and lets the elevator's AI see him arrive.
-poke $7840 $34
-poke $7880 $17
+poke @UNIT_LOC_X@ $34
+poke @UNIT_LOC_Y@ $17
 press k
 run 8
 release k

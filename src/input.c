@@ -185,6 +185,10 @@ void plat_clear_key_buffer(void)
     __asm__("sei");
     q_head = q_tail = 0;
     __asm__("cli");
+    /* CLEAR_KEY_BUFFER's tail. Emptying the buffer without this lets whatever
+     * the player is still holding arrive immediately as a fresh press, which is
+     * exactly what the routine is called to prevent. */
+    KEYTIMER = 20;
 }
 
 /* KEY_REPEAT, from x16Robots.ASM 1988. The main game loop calls this before

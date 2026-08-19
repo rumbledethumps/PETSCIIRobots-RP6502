@@ -15,6 +15,7 @@ PETSCII_INC = 1
         .globalzp TILE, MAP_X, MAP_Y, UNIT, MOVE_TYPE, MOVE_RESULT
         .globalzp UNIT_FIND, MAP_PTR, SOURCE, CUR_PATTERN
         .globalzp TEMP_X, TEMP_Y, DECNUM, ATTRIB
+        .global NEW_BUTTONS, MSG_PAUSED
         .global RANDOM, SSCOUNT
         .global MUSIC_ON, SOUND_EFFECT, TEMPO_TIMER, TEMPO, DATA_LINE
         .global ARP_MODE, CHORD_ROOT

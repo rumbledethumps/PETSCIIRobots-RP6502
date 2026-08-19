@@ -63,9 +63,27 @@ function(petscii_add_emu_test name)
     endif()
     set(_scratch ${CMAKE_CURRENT_BINARY_DIR}/scratch/${name})
     file(MAKE_DIRECTORY ${_scratch})
+
+    # Scripts run from a generated copy with @SYMBOL@ replaced by the address
+    # the linker actually chose. Doing it at build time rather than by hand is
+    # what stops a test breaking every time the code above a variable changes
+    # size -- which it did, four at once, when the gamepad code landed.
+    set(_script ${CMAKE_CURRENT_BINARY_DIR}/scripts/${name}.txt)
+    add_custom_command(
+        OUTPUT ${_script}
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/expand_symbols.py
+                $<TARGET_FILE:robots>.map
+                ${CMAKE_CURRENT_LIST_DIR}/${name}.txt ${_script}
+        DEPENDS ${CMAKE_CURRENT_LIST_DIR}/${name}.txt
+                ${CMAKE_SOURCE_DIR}/tools/expand_symbols.py robots
+        COMMENT "Resolving symbols in ${name}.txt"
+        VERBATIM)
+    list(APPEND PETSCII_EMU_SCRIPTS ${_script})
+    set(PETSCII_EMU_SCRIPTS ${PETSCII_EMU_SCRIPTS} PARENT_SCOPE)
+
     add_test(NAME emu.${name}
              COMMAND ${RP6502_EMU} --mute --seed ${E_SEED} --tmpdrive
-                     --script ${CMAKE_CURRENT_LIST_DIR}/${name}.txt ${E_ROM}
+                     --script ${_script} ${E_ROM}
              WORKING_DIRECTORY ${_scratch})
     set_tests_properties(emu.${name} PROPERTIES TIMEOUT ${E_TIMEOUT} LABELS emu)
 endfunction()

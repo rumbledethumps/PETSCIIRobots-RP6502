@@ -13,8 +13,9 @@
 #
 # Regenerate with:  tools/playthrough.py e 75 42
 #
-# BORDER's RAM address ($60CF) comes from build/.../robots.map and moves when the
-# code above it changes size. If this fails at the poke, look there first.
+# @SYMBOL@ is a RAM address resolved from the linker map when the tests are
+# generated, because RAM symbols move whenever the code above them changes
+# size. XRAM addresses stay literal -- the program picks those, in src/xram.h.
 wait "MENU"
 run 30
 press k
@@ -166,7 +167,7 @@ peek xram:$FE06 $01
 # Index 6 of the ramp is 31, and so is index 5, so this reads the same whether
 # one tick or two have gone by. Red occupies the low five bits of the RGB555
 # entry and bit 5 is the opacity flag: $3F is full red, opaque.
-poke $60CF $06
+poke @BORDER@ $06
 run 1
 peek xram:$E000 $3F $00
 run 1
@@ -176,5 +177,5 @@ peek xram:$E000 $3F $00
 # going back to opaque black is what says it cleaned up. Leaving it tinted would
 # stain the whole playfield for the rest of the game.
 run 40
-peek $60CF $00
+peek @BORDER@ $00
 peek xram:$E000 $20 $00

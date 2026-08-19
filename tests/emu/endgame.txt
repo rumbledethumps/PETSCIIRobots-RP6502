@@ -6,19 +6,20 @@
 # and the endgame statistics with no coverage at all.
 #
 # poke closes it: write the state the game would have reached and let it read it
-# back. UNIT_TYPE[1..27] at $7801 goes to zero -- every robot dead -- and the
+# back. UNIT_TYPE[1..27] goes to zero -- every robot dead -- and the
 # pad's own AI notices on its next pass and clears UNIT_A, exactly as it would
 # have after a real fight. Nothing else is faked; the player still walks to the
 # pad and DEMATERIALIZE still runs its 48 frames.
 #
 # level-h because its exit pad at 21,25 is the only one in fourteen levels
 # reachable without keys. The route was recorded by
-#     tools/playthrough.py h 21 25 --poke "$7801 $00 x27"
+#     tools/playthrough.py h 21 25 --poke "@UNIT_TYPE+1@ $00 x27"
 # which drives the emulator a step at a time and re-plans from where the player
 # actually is; replayed open loop it is deterministic under --seed 1.
 #
-# RAM addresses come from build/.../robots.map and move when the code above them
-# changes size. If this test starts failing at the poke, check them there first.
+# @SYMBOL@ is a RAM address resolved from the linker map when the tests are
+# generated, because RAM symbols move whenever the code above them changes
+# size. XRAM addresses stay literal -- the program picks those, in src/xram.h.
 wait "MENU"
 run 30
 press k
@@ -62,7 +63,7 @@ run 6
 release space
 wait "BRINGUP OK"
 run 20
-poke $7801 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+poke @UNIT_TYPE+1@ $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 run 60
 press l
 run 8

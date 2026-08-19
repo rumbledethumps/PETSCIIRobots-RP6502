@@ -14,10 +14,13 @@
 # exercising.
 #
 # The route was recorded by
-#     tools/playthrough.py k 9 5 --keys --poke "$776C $07" --poke "$79C0 $01"
-# RAM addresses from build/.../robots.map: KEYS $776C, UNIT_HEALTH $79C0. The
-# keys are poked because level-k's route passes a locked door; without them the
-# driver walks around and never meets the evilbot.
+#     tools/playthrough.py k 9 5 --keys --poke "@KEYS@ $07" --poke "@UNIT_HEALTH@ $01"
+# @SYMBOL@ is a RAM address resolved from the linker map when the tests are
+# generated, because RAM symbols move whenever the code above them changes
+# size. XRAM addresses stay literal -- the program picks those, in src/xram.h.
+#
+# The keys are poked because level-k's route passes a locked door; without
+# them the driver walks around and never meets the evilbot.
 wait "MENU"
 run 30
 press k
@@ -73,8 +76,8 @@ run 6
 release space
 wait "BRINGUP OK"
 run 20
-poke $776C $07
-poke $79C0 $01
+poke @KEYS@ $07
+poke @UNIT_HEALTH@ $01
 run 60
 press j
 run 8

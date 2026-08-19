@@ -193,6 +193,146 @@ static void walk(unsigned char facing, void (*request)(void))
     }
 }
 
+static void cycle_weapon(void);
+static void cycle_item(void);
+
+/* PAUSE_GAME, from x16Robots.ASM 1412. Run/stop stops the clock, says so, and
+ * offers to quit: Y kills the player, which is how the original gets to the
+ * game-over path from here; N or run/stop again carries on.
+ *
+ * The wait is a tight poll with no BACKGROUND_TASKS, so the world really is
+ * stopped rather than merely quiet -- which it can be, now that the keyboard is
+ * scanned by the interrupt.
+ */
+static void pause_game(void)
+{
+    unsigned char key;
+
+    plat_play_sound(SFX_BEEP2);
+    CLOCK_ACTIVE = 0;
+    plat_scroll_info();
+    SOURCE = MSG_PAUSED;
+    plat_print_info();
+    plat_clear_key_buffer();
+
+    for (;;) {
+        key = plat_getin();
+        if (key == 3 || key == 'N')
+            break;
+        if (key == 'Y') {
+            UNIT_TYPE[0] = 0;           /* PG6: dead, and the loop notices */
+            return;
+        }
+    }
+
+    plat_play_sound(SFX_BEEP2);
+    plat_scroll_info();
+    plat_scroll_info();
+    plat_scroll_info();
+    plat_clear_key_buffer();
+    CLOCK_ACTIVE = 1;
+}
+
+/* AFTER_MOVE_SNES. Not the same as the keyboard's AFTER_MOVE: the repeats are
+ * 6 frames rather than 7, and it clears the direction latches so a held d-pad
+ * has to be seen again by the next read. */
+static void walk_pad(unsigned char facing, void (*request)(void))
+{
+    PLAYER_DIRECTION = facing;
+    UNIT = 0;
+    MOVE_TYPE = MOVE_WALK;
+    request();
+    if (MOVE_RESULT == 1) {
+        animate_player();
+        CACULATE_AND_REDRAW();
+    } else {
+        plat_display_player_sprite();
+    }
+
+    if (KEY_FAST) {
+        KEYTIMER = 6;
+        NEW_BUTTONS[PAD_UP] = NEW_BUTTONS[PAD_DOWN] = 0;
+        NEW_BUTTONS[PAD_LEFT] = NEW_BUTTONS[PAD_RIGHT] = 0;
+    } else {
+        KEYTIMER = 15;
+        KEY_FAST = 1;
+    }
+}
+
+/* SC01-SC75: one pass of the gamepad, when CONTROL says the pad is in use.
+ *
+ * Directions are gated on KEYTIMER and the buttons are not, which is why the
+ * original jumps straight to SC40 while the timer is running -- you can keep
+ * firing while a walk is still on its cooldown. SELECT is a shift key rather
+ * than an action: held with left it opens the map, with L it cycles the item
+ * and with R the weapon.
+ */
+static void gamepad_pass(void)
+{
+    plat_gamepad_read();
+
+    if (!KEYTIMER) {
+        /* SC02: forget the directions on both sides and look again, so a
+         * d-pad that is still held reads as a new press. */
+        NEW_BUTTONS[PAD_UP] = NEW_BUTTONS[PAD_DOWN] = 0;
+        NEW_BUTTONS[PAD_LEFT] = NEW_BUTTONS[PAD_RIGHT] = 0;
+        plat_gamepad_forget_dirs();
+        plat_gamepad_read();
+
+        if (NEW_BUTTONS[PAD_LEFT]) {
+            if (pad_held(PAD_SELECT)) {
+                NEW_BUTTONS[PAD_LEFT] = 0;
+                plat_display_map();
+                return;
+            }
+            walk_pad(FACE_LEFT, REQUEST_WALK_LEFT);
+            return;
+        }
+        if (NEW_BUTTONS[PAD_RIGHT]) {
+            walk_pad(FACE_RIGHT, REQUEST_WALK_RIGHT);
+            return;
+        }
+        if (NEW_BUTTONS[PAD_UP]) {
+            walk_pad(FACE_UP, REQUEST_WALK_UP);
+            return;
+        }
+        if (NEW_BUTTONS[PAD_DOWN]) {
+            walk_pad(FACE_DOWN, REQUEST_WALK_DOWN);
+            return;
+        }
+        KEY_FAST = 0;                   /* SC35: nothing held, slow repeat again */
+    }
+
+    /* SC40: the buttons, which do not wait for the timer. The four face
+     * buttons fire in the direction they sit in. */
+    if (NEW_BUTTONS[PAD_Y]) { FIRE_LEFT();  NEW_BUTTONS[PAD_Y] = 0; }
+    if (NEW_BUTTONS[PAD_A]) { FIRE_RIGHT(); NEW_BUTTONS[PAD_A] = 0; }
+    if (NEW_BUTTONS[PAD_X]) { FIRE_UP();    NEW_BUTTONS[PAD_X] = 0; }
+    if (NEW_BUTTONS[PAD_B]) { FIRE_DOWN();  NEW_BUTTONS[PAD_B] = 0; }
+
+    if (NEW_BUTTONS[PAD_L]) {
+        if (pad_held(PAD_SELECT))
+            cycle_item();
+        else
+            SEARCH_OBJECT();
+        NEW_BUTTONS[PAD_L] = 0;
+        KEYTIMER = 15;
+    }
+    if (NEW_BUTTONS[PAD_R]) {
+        if (pad_held(PAD_SELECT))
+            cycle_weapon();
+        else
+            MOVE_OBJECT();
+        NEW_BUTTONS[PAD_R] = 0;
+        KEYTIMER = 15;
+    }
+    if (NEW_BUTTONS[PAD_START]) {
+        USE_ITEM();
+        NEW_BUTTONS[PAD_START] = 0;
+        KEYTIMER = 15;
+    }
+}
+
 /* CYCLE_WEAPON and CYCLE_ITEM: step to the next one and let the display
  * routine's preselect rules sort out an empty slot. */
 static void cycle_weapon(void)
@@ -359,6 +499,7 @@ int main(void)
     video_init();
     plat_sprites_init();
     input_init();
+    xreg_ria_gamepad(XR_GAMEPAD);       /* four pads of ten bytes; we read one */
     /* Before the interrupt is enabled: after that, the engine ticks from it and
      * the PSG registers belong to the interrupt. */
     psg_init();
@@ -410,6 +551,15 @@ int main(void)
             continue;
         }
 
+        /* MG00: the pad instead of the keyboard, if that is what was chosen.
+         * SC75 still reads the keyboard, but only to notice run/stop. */
+        if (CONTROL == CONTROL_GAMEPAD) {
+            gamepad_pass();
+            if (plat_getin() == 3)
+                pause_game();
+            continue;
+        }
+
         /* KY01: KEY_REPEAT then GETIN. The menus call GETIN alone, which is
          * why they act on presses and only walking repeats. */
         plat_key_repeat();
@@ -451,6 +601,8 @@ int main(void)
             SEARCH_OBJECT();
         else if (key == KEY_MOVE_UP[12])
             MOVE_OBJECT();
+        else if (key == 3)              /* MG18: run/stop */
+            pause_game();
         else if (key == 9)              /* TAB: the whole map */
             plat_display_map();
     }

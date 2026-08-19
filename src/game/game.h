@@ -129,6 +129,9 @@ extern unsigned char STANDARD_CONTROLS[13];
 /* ---- the intro menu -------------------------------------------------- */
 extern unsigned char MENUY;             /* 0..3, which option is selected    */
 extern unsigned char MENUCOL;
+/* What the intro menu's third option cycles. 2 is the gamepad; the X16
+ * tests CONTROL against 2 in five places. */
+#define CONTROL_GAMEPAD 2
 extern unsigned char SELECTED_MAP;      /* 0..13                             */
 extern unsigned char DIFF_LEVEL;        /* 0 easy, 1 normal, 2 hard          */
 extern unsigned char SPRITECOLSTATE, SPRITECOLTIMER;
@@ -140,6 +143,23 @@ extern unsigned char INTRO_TEXT[], SCR_TEXT[], SCR_ENDGAME[], SCR_CUSTOM_KEYS[];
 extern unsigned char CINEMA_MESSAGE[], THREE_FACES[];
 /* Index 0 counts down, 1..10 is the colour ramp the interrupt walks. */
 extern unsigned char BORDER[], BGFLASH[];
+
+/* The twelve gamepad latches, in the order the X16 unpacked JOYSTICK_GET into:
+ * a press sets one and the code that acts on it clears it. Named indices rather
+ * than twelve externs because SNES_CONTROLER_READ walks all twelve at once. */
+extern unsigned char NEW_BUTTONS[12];
+#define PAD_B       0
+#define PAD_Y       1
+#define PAD_SELECT  2
+#define PAD_START   3
+#define PAD_UP      4
+#define PAD_DOWN    5
+#define PAD_LEFT    6
+#define PAD_RIGHT   7
+#define PAD_A       8
+#define PAD_X       9
+#define PAD_L      10
+#define PAD_R      11
 
 /* One colour per tile for the live map, both nibbles the same because a map
  * tile is two pixels of a 4bpp bitmap. */
@@ -169,7 +189,7 @@ extern unsigned char WIN_MSG[8], LOS_MSG[9];
 
 /* Screen-code strings: 0 ends one, 255 forces a new line. */
 extern unsigned char INTRO_MESSAGE[];
-extern unsigned char MSG_SEARCHING[];
+extern unsigned char MSG_SEARCHING[], MSG_PAUSED[];
 
 /* ---- the actions the player can take --------------------------------- */
 void USE_ITEM(void);

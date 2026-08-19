@@ -195,7 +195,9 @@ KEY_SEARCH:       .res 1
 KEY_MOVE:         .res 1
 
 ; New gamepad presses, latched until the game consumes them. Same order the X16
-; unpacked them in.
+; unpacked them in, and contiguous because SNES_CONTROLER_READ walks all twelve
+; with one index.
+NEW_BUTTONS:
 NEW_B:      .res 1
 NEW_Y:      .res 1
 NEW_SELECT: .res 1

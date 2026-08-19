@@ -927,8 +927,112 @@ void plat_elevator_select(void)
     }
 }
 
-/* M6: the gamepad path. CONTROL is 0 or 1 here, so the AI never reaches this. */
-void plat_gamepad_read(void) { }
+/* SNES_CONTROLER_READ, from x16Robots.ASM 778.
+ *
+ * The X16 asks the KERNAL for a joystick word and unpacks it into twelve bytes
+ * -- B, Y, SELECT, START, UP, DOWN, LEFT, RIGHT, A, X, L, R -- keeping the
+ * previous read alongside so it can tell a press from a hold. A press sets the
+ * matching NEW_ latch and leaves it set; whichever piece of code acts on it
+ * clears it. That is the contract the ported assembly expects: items.s calls
+ * this from MOVE_OBJECT and USER_SELECT_OBJECT and then reads NEW_ directly.
+ *
+ * The RIA keeps the same twelve facts in XRAM, continuously updated, so this
+ * reads four bytes of the player-one block instead of calling anything:
+ * DPAD holds the directions in bits 0-3 and a connected flag in bit 7, BTN0 the
+ * face and shoulder buttons, BTN1 select and start.
+ *
+ * FACE BUTTONS ARE MAPPED BY POSITION, NOT BY NAME. The original fires in the
+ * direction of the button under your thumb -- SNES Y is the left button and
+ * fires left, A is the right one and fires right, X is the top, B is the
+ * bottom. The RIA reports buttons by label, and a label sits in a different
+ * place depending on the pad: DPAD bits 4-5 say which convention this one uses,
+ * and an "Eastern BA" pad has A and B the other way round from a "Western AB"
+ * one. Mapping by name would fire left when you press the top button on half
+ * the pads in the world, so the layout byte picks the positions.
+ *
+ * BOTH STICKS ARE MERGED IN. The RIA reduces each to four direction bits in
+ * STICKS, so the left one joins the d-pad and the right one joins the face
+ * buttons where each points. The pad becomes twin-stick and nothing above this
+ * function knows: the twelve latches are still the twelve the X16 unpacked. */
+
+#define PAD_CONNECTED 0x80      /* DPAD bit 7                       */
+#define PAD_TYPE_MASK 0x30      /* DPAD bits 4-5                    */
+#define PAD_TYPE_BA   0x20      /* 2 = Eastern BA, A and B swapped  */
+
+static unsigned char pad_now[12], pad_last[12];
+
+void plat_gamepad_read(void)
+{
+    unsigned char i, dpad, sticks, btn0, btn1, bottom, right, left, top;
+
+    for (i = 0; i < 12; i++)
+        pad_last[i] = pad_now[i];
+
+    RIA.addr0 = XR_GAMEPAD;             /* player one */
+    RIA.step0 = 1;
+    dpad = RIA.rw0;
+    sticks = RIA.rw0;
+    btn0 = RIA.rw0;
+    btn1 = RIA.rw0;
+
+    if (!(dpad & PAD_CONNECTED)) {
+        for (i = 0; i < 12; i++)
+            pad_now[i] = 0;
+        return;                         /* no pad: nothing held, nothing new */
+    }
+
+    if ((dpad & PAD_TYPE_MASK) == PAD_TYPE_BA) {
+        bottom = 0x02; right = 0x01;    /* B, A */
+        left   = 0x10; top   = 0x08;    /* Y, X */
+    } else {
+        bottom = 0x01; right = 0x02;    /* A/Cross, B/Circle */
+        left   = 0x08; top   = 0x10;    /* X/Square, Y/Triangle */
+    }
+
+    /* The left stick walks, alongside the d-pad: STICKS bits 0-3 are the same
+     * four directions already reduced to bits, so this is an OR rather than a
+     * threshold to pick. */
+    pad_now[PAD_UP]     = (dpad & 0x01) || (sticks & 0x01);
+    pad_now[PAD_DOWN]   = (dpad & 0x02) || (sticks & 0x02);
+    pad_now[PAD_LEFT]   = (dpad & 0x04) || (sticks & 0x04);
+    pad_now[PAD_RIGHT]  = (dpad & 0x08) || (sticks & 0x08);
+
+    /* The right stick fires, alongside the face buttons -- bits 4-7, the same
+     * four directions again. The face buttons already fire in the direction
+     * they sit in, so the stick joins each one where it points and the pad ends
+     * up twin-stick without the game knowing anything changed. */
+    pad_now[PAD_X]      = (btn0 & top)    || (sticks & 0x10);   /* fire up    */
+    pad_now[PAD_B]      = (btn0 & bottom) || (sticks & 0x20);   /* fire down  */
+    pad_now[PAD_Y]      = (btn0 & left)   || (sticks & 0x40);   /* fire left  */
+    pad_now[PAD_A]      = (btn0 & right)  || (sticks & 0x80);   /* fire right */
+
+    pad_now[PAD_L]      = (btn0 & 0x40) != 0;   /* L1 */
+    pad_now[PAD_R]      = (btn0 & 0x80) != 0;   /* R1 */
+    pad_now[PAD_SELECT] = (btn1 & 0x04) != 0;
+    pad_now[PAD_START]  = (btn1 & 0x08) != 0;
+
+    for (i = 0; i < 12; i++)
+        if (!NEW_BUTTONS[i] && pad_now[i] && !pad_last[i])
+            NEW_BUTTONS[i] = 1;
+}
+
+/* SNES_SELECT and friends: whether a button is down now, as opposed to whether
+ * it has just been pressed. SELECT is used as a shift key rather than an
+ * action, so the code that reads it wants the hold, not the edge. */
+unsigned char __fastcall__ pad_held(unsigned char button)
+{
+    return pad_now[button];
+}
+
+/* SC02 zeroes SNES_UP..SNES_RIGHT before reading again, which makes a direction
+ * that is still held look like a fresh press and is how a held d-pad repeats.
+ * Those four live here rather than in the game's variables, so the main loop
+ * asks for them to be forgotten instead of writing them. */
+void plat_gamepad_forget_dirs(void)
+{
+    pad_now[PAD_UP] = pad_now[PAD_DOWN] = 0;
+    pad_now[PAD_LEFT] = pad_now[PAD_RIGHT] = 0;
+}
 
 /* The border and background flashers, from x16Robots.ASM 652-677.
  *
