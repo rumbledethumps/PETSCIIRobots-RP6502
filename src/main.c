@@ -294,6 +294,12 @@ int main(void)
 
     put_string(0, 27, "petscii robots rp6502", 5);
     put_string(0, 28, "ijkl or arrows to walk", 1);
+
+    /* Publish state before announcing readiness, not after. A test that waits
+     * for the console line then peeks the probe would otherwise be racing the
+     * first pass through the loop -- which is exactly the flake CI found and a
+     * local run did not. */
+    update_probe();
     printf("BRINGUP OK level-a player %u,%u\n", UNIT_LOC_X[0], UNIT_LOC_Y[0]);
 
     last_vsync = RIA.vsync;
