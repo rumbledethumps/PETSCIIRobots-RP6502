@@ -8,6 +8,14 @@
 # because it exercises GET_TILE_FROM_MAP's address arithmetic, the
 # (attrib & MOVE_TYPE) == MOVE_TYPE test, and CHECK_FOR_UNIT together.
 
+# Start the game from the intro menu. START GAME is the first option, so space
+# is enough; the tests that care about the menu itself drive it further.
+wait "MENU"
+run 30
+press space
+run 6
+release space
+
 wait "BRINGUP OK"
 
 # 'P','R', playing, level a, player 22,38

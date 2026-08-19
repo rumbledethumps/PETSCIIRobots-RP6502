@@ -14,6 +14,14 @@
 # Slot 0 is the player and has no AI. The dispatcher walks slots 1..63,
 # decrements each unit's timer, and runs its routine when the timer reaches zero.
 
+# Start the game from the intro menu. START GAME is the first option, so space
+# is enough; the tests that care about the menu itself drive it further.
+wait "MENU"
+run 30
+press space
+run 6
+release space
+
 wait "AI60"
 
 # 16 live robots in level-a, and nothing drawn over the terrain: the player

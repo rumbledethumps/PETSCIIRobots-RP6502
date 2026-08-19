@@ -10,6 +10,7 @@ target_sources(robots PRIVATE
     game/window.s             # what should be on screen, not how to draw it
     game/transporter.s        # unit type 23, kept apart as the X16 did
     game/messages.s
+    game/screens.s            # the four screen layouts and the intro artwork
     game/items.s              # using, searching, pushing, firing
     game/irq.s                # the VSYNC interrupt: timers and the game clock
     game/globals.s

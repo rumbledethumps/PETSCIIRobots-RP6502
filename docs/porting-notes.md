@@ -183,3 +183,27 @@ loop never has to know.
 
 The VIA is left alone. It is a free-running timer, which suits genuinely
 asynchronous work; the game tick is not that.
+
+## The intro screen and the menu
+
+`src/game/screens.s` carries the four screen layouts and the intro artwork from
+`x16Robots.ASM` 5327-5457. The layouts are run-length encoded 40x30 character
+grids -- a literal byte is one cell, and byte 96 introduces "the next byte,
+count+1 times". They stay compressed: `SCR_TEXT` is eighteen bytes encoded and
+twelve hundred expanded, so decoding costs about sixty bytes of code and saves
+four thousand.
+
+The menu itself is presentation, so it is C rather than ported assembly, but it
+keeps the original's shape: four options at character rows 2 to 5, the selected
+one flashed by cycling its colour through `SPRITECOLCHART`, and the intro
+robot's expression redrawn from `THREE_FACES` when the difficulty changes -- a
+16x10 image at 2bpp, dropped into the bitmap plane at 234,95.
+
+One thing worth knowing for the tests: the game reads the RIA's HID keycode bit
+array, so the emulator's `type` command does not reach it. `type` goes through
+the terminal; `press` and `release` drive the bitmap. Every test drives the game
+with `press`.
+
+`frames_total`, which the tests synchronise on, is reset when play starts rather
+than counted from boot, so a checkpoint means the same thing however long
+someone sat on the menu.

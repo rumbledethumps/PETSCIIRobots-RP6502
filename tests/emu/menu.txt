@@ -1,0 +1,54 @@
+# The intro screen: the title artwork in the bitmap plane, the menu layout
+# decoded over it into the character plane, and four options that respond.
+#
+# This is the first thing that needs the screen-layout decoder. The layouts are
+# run-length encoded 40x30 grids -- SCR_TEXT is eighteen bytes encoded and
+# twelve hundred expanded -- so they ship compressed and are decoded on the way
+# to the screen.
+#
+# Note that the harness has to drive this with `press`, not `type`: the game
+# reads the RIA's HID keycode bit array, and `type` goes through the terminal.
+
+wait "MENU"
+run 40
+
+# The title screen, with START GAME selected.
+expect-crc 334BC593
+shot "menu.png"
+
+# Down twice to DIFFICULTY, and cycle it. The intro robot's expression changes
+# with the setting: three 16x10 images at 2bpp, drawn into the bitmap plane.
+press down
+run 6
+release down
+run 10
+press down
+run 6
+release down
+run 10
+mark
+press space
+run 10
+release space
+run 30
+expect-changed
+shot "menu_difficulty.png"
+
+# Back to the top and start. The game screen replaces the title, and the level
+# loads.
+press up
+run 6
+release up
+run 10
+press up
+run 6
+release up
+run 10
+press space
+run 6
+release space
+
+wait "BRINGUP OK"
+run 30
+# Playing, level a, player at 22,38 with full health.
+peek xram:$FE00 $50 $52 $02 $00 $16 $26 $0C

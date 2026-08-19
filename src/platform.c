@@ -4,8 +4,10 @@
  * in for a routine that lived in the X16's machine-specific file and talked to
  * VERA or ZSOUND directly.
  */
+#include <fcntl.h>
 #include <rp6502.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "game/game.h"
 #include "input.h"
@@ -113,6 +115,126 @@ static void fill_glyphs(unsigned char col, unsigned char row,
     while (n--)
         RIA.rw0 = glyph;
     RIA.step0 = 1;
+}
+
+/* ---- whole screens ---------------------------------------------------- */
+
+/* Every colour byte green, which is what the X16 leaves behind before it
+ * decodes a screen layout over the top. The layouts carry glyphs only. */
+void plat_green_screen(void)
+{
+    unsigned i;
+    RIA.addr0 = XR_CHARS + 1;           /* the colour byte of cell 0 */
+    RIA.step0 = 2;
+    for (i = 0; i < SCR_COLS * SCR_ROWS; i++)
+        RIA.rw0 = 5;
+    RIA.step0 = 1;
+}
+
+/* A 40x30 layout, run-length encoded: a literal byte is one cell, and byte 96
+ * introduces "the next byte, count+1 times". even_odd picks the plane -- 0 for
+ * glyphs, 1 for colours -- exactly as the X16 selects it by starting on an even
+ * or odd address with the increment set to two. */
+void plat_decompress_screen(const unsigned char *src, unsigned char even_odd)
+{
+    unsigned char x = 0, y = 0, ch, n;
+
+    RIA.addr0 = XR_CHARS + even_odd;
+    RIA.step0 = 2;
+    while (y < SCR_ROWS) {
+        ch = *src++;
+        n = 1;
+        if (ch == 96) {                 /* the repeat flag */
+            ch = *src++;
+            n = (unsigned char)(*src++ + 1);
+        }
+        while (n-- && y < SCR_ROWS) {
+            RIA.rw0 = ch;
+            if (++x == SCR_COLS) {
+                x = 0;
+                if (++y < SCR_ROWS)
+                    RIA.addr0 = CELL(0, y) + even_odd;
+            }
+        }
+    }
+    RIA.step0 = 1;
+}
+
+/* A 320x240 4bpp screen into the bitmap plane. read_xram() hands the whole
+ * transfer to the RIA, so the 6502 never touches the pixels; count is capped at
+ * 0x7FFF per call, so this is two calls rather than a loop of small ones --
+ * bulk transfer approaches 800 KB/s but every call pays a round trip. */
+void plat_load_bitmap(const char *name)
+{
+    int fd = open(name, O_RDONLY);
+    if (fd < 0)
+        return;
+    read_xram(XR_BITMAP, 0x7000u, fd);
+    read_xram(XR_BITMAP + 0x7000u, 0x2600u, fd);
+    close(fd);
+}
+
+void plat_display_intro_screen(void)
+{
+    plat_green_screen();
+    plat_decompress_screen(INTRO_TEXT, 0);
+    plat_load_bitmap("ROM:intropic");
+}
+
+void plat_display_game_screen(void)
+{
+    plat_green_screen();
+    plat_decompress_screen(SCR_TEXT, 0);
+    plat_load_bitmap("ROM:gamepic");
+}
+
+void plat_display_endgame_screen(void)
+{
+    plat_green_screen();
+    plat_decompress_screen(SCR_ENDGAME, 0);
+}
+
+/* ---- the intro menu --------------------------------------------------- */
+
+/* The four options sit at character rows 2 to 5, columns 4 to 13. Selecting one
+ * is a colour change, so only the colour bytes move. */
+void __fastcall__ plat_flash_menu_option(unsigned char color)
+{
+    unsigned char i;
+    RIA.addr0 = CELL(4, MENUY + 2) + 1;
+    RIA.step0 = 2;
+    for (i = 0; i < 10; i++)
+        RIA.rw0 = color;
+    RIA.step0 = 1;
+}
+
+/* The level name, sixteen characters at row 9 column 2. MAP_NAMES is one
+ * sixteen-byte name per level, so the offset is the level number times
+ * sixteen -- which is what CALC_MAP_NAME computes the long way. */
+void plat_display_map_name(void)
+{
+    const unsigned char *p = MAP_NAMES + (unsigned)SELECTED_MAP * 16;
+    unsigned char i;
+    RIA.addr0 = CELL(2, 9);
+    RIA.step0 = 2;
+    for (i = 0; i < 16; i++)
+        RIA.rw0 = *p++;
+    RIA.step0 = 1;
+}
+
+/* The intro robot's expression, three 16x10 images at 2bpp, one per difficulty.
+ * It goes into the bitmap plane at 234,95 -- so 160 bytes a row, and 234/2 = 117
+ * bytes in. */
+void plat_change_difficulty_level(void)
+{
+    const unsigned char *p = THREE_FACES + (unsigned)DIFF_LEVEL * 80;
+    unsigned char row, i;
+    RIA.step0 = 1;
+    for (row = 0; row < 10; row++) {
+        RIA.addr0 = (unsigned)(95 + row) * 160u + 117u;
+        for (i = 0; i < 8; i++)
+            RIA.rw0 = *p++;
+    }
 }
 
 /* ---- the message console --------------------------------------------- */

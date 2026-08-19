@@ -10,6 +10,14 @@
 # up here and names itself. The CRC catches everything else at once but churns
 # on any art change, so it is one line, not eleven.
 
+# Start the game from the intro menu. START GAME is the first option, so space
+# is enough; the tests that care about the menu itself drive it further.
+wait "MENU"
+run 30
+press space
+run 6
+release space
+
 wait "BRINGUP OK"
 
 # Cells are {glyph, colour} pairs. The colour byte's high nibble is 0 because

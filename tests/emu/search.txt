@@ -14,6 +14,14 @@
 # cursor sprite, the timer the search spins on -- which only advances because
 # the VSYNC interrupt is running -- the message console, and the HUD.
 
+# Start the game from the intro menu. START GAME is the first option, so space
+# is enough; the tests that care about the menu itself drive it further.
+wait "MENU"
+run 30
+press space
+run 6
+release space
+
 wait "AI60"
 
 # One square left, to x=21.

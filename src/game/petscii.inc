@@ -35,6 +35,8 @@ PETSCII_INC = 1
 
 ; ---- messages -----------------------------------------------------------
         .global INTRO_MESSAGE
+        .global INTRO_TEXT, SCR_TEXT, SCR_ENDGAME, SCR_CUSTOM_KEYS
+        .global CINEMA_MESSAGE, THREE_FACES
         .global MSG_TERMINATED, MSG_TRANS1, MSG_ELEVATOR, MSG_LEVELS
         .global MSG_BLOCKED, MSG_CANTMOVE, MSG_EMPUSED, MSG_MUCHBET
         .global MSG_NOTFOUND, MSG_SEARCHING
@@ -51,7 +53,9 @@ PETSCII_INC = 1
         .global KEY_CYCLE_WEAPONS, KEY_CYCLE_ITEMS, KEY_USE, KEY_SEARCH, KEY_MOVE
         .global NEW_B, NEW_Y, NEW_SELECT, NEW_START, NEW_UP, NEW_DOWN
         .global NEW_LEFT, NEW_RIGHT, NEW_A, NEW_X, NEW_BACK_L, NEW_BACK_R
-        .global BGFLASH, STANDARD_CONTROLS
+        .global BGFLASH, STANDARD_CONTROLS, SPRITECOLCHART
+        .global MENUY, MENUCOL, SELECTED_MAP, DIFF_LEVEL
+        .global SPRITECOLSTATE, SPRITECOLTIMER, MAP_NAMES
 
 ; ---- routines -----------------------------------------------------------
         .global GET_TILE_FROM_MAP, PLOT_TILE_TO_MAP, CHECK_FOR_UNIT

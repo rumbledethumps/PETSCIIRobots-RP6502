@@ -189,3 +189,13 @@ around it.
 | `BSS` | 5,549 | |
 | `LEVELDATA` | 8,704 | |
 | **RAM used, `$0200–$7DFF`** | **31,743** of 64,768 — **32.2 KB free** |
+
+## M6 (part) — the intro screen and menu
+
+| segment | bytes |
+|---|---|
+| `CODE` | 17,595 |
+| `RODATA` + `DATA` | 2,437 |
+| `BSS` | 5,558 |
+| `LEVELDATA` | 8,704 |
+| **RAM used** | **≈34,300** of 64,768 — **≈30 KB free** |

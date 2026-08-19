@@ -112,6 +112,15 @@ PLAYER_ANIMATE:   .res 1        ; 0..2, added to PLAYER_DIRECTION for the frame
 ; 0 keyboard, 1 custom keys, 2 gamepad. The X16 called the third one SNES.
 CONTROL:        .res 1
 
+; ---- the intro menu -----------------------------------------------------
+MENUY:          .res 1          ; which of the four options is selected
+MENUCOL:        .res 1          ; the colour it is being flashed in
+; SELECTED_MAP lives in messages.s: it came across with the level names it
+; indexes, which is where the original keeps it too.
+DIFF_LEVEL:     .res 1          ; 0 easy, 1 normal, 2 hard
+SPRITECOLSTATE: .res 1          ; walks SPRITECOLCHART for the flash
+SPRITECOLTIMER: .res 1
+
 ; The thirteen bindings, in the order STANDARD_CONTROLS lists them. Declared as
 ; one array because SET_CUSTOM_KEYS fills it with STA KEY_MOVE_UP,Y.
 KEY_MOVE_UP:      .res 1
@@ -152,6 +161,9 @@ BORDER:         .byte 0, 0, 8, 15, 25, 31, 31, 25, 15, 8, 0
 
 ; The background flash, same shape: index 0 counts down, the rest is the ramp.
 BGFLASH:        .byte 0, 0, 8, 15, 79, 159, 159, 79, 15, 8, 0
+
+; The colours the selected menu option cycles through.
+SPRITECOLCHART: .byte 0, 11, 12, 15, 1, 15, 12, 11
 
 ; The thirteen defaults: I K J L to walk, W S A D to fire, F1 and F3 to cycle,
 ; space to use, Z to search, M to push. Copied into KEY_MOVE_UP at level start.

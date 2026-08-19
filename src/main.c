@@ -69,22 +69,6 @@ static void load_tileset(void)
     close(fd);
 }
 
-/* A 320x240 4bpp screen into the bitmap plane. read_xram() hands the whole
- * transfer to the RIA, so the 6502 never touches the pixels; count is capped at
- * 0x7FFF per call, so this is two calls rather than a loop of small ones --
- * bulk transfer approaches 800 KB/s but every call pays a round trip. */
-static void load_bitmap(const char *name)
-{
-    int fd = open(name, O_RDONLY);
-    if (fd < 0)
-        die(name);
-    if (read_xram(XR_BITMAP, 0x7000u, fd) != 0x7000)
-        die("read_xram lo");
-    if (read_xram(XR_BITMAP + 0x7000u, 0x2600u, fd) != 0x2600)
-        die("read_xram hi");
-    close(fd);
-}
-
 static void video_init(void)
 {
     /* Selecting a canvas clears every plane's programming and takes the
@@ -212,30 +196,116 @@ static void cycle_item(void)
     plat_display_item();
 }
 
-int main(void)
+/* Wait for the next game tick, which the VSYNC interrupt raises. */
+static unsigned char last_frame;
+
+static void wait_tick(void)
 {
-    unsigned char i, key, last_frame;
+    while (last_frame == IRQ_FRAME)
+        ;
+    last_frame = IRQ_FRAME;
+    frame_counter++;
+    /* Counted from the start of play, not from boot, so the checkpoints mean
+     * the same thing however long someone sat on the menu. */
+    if (++frames_total == 60 || frames_total == 300)
+        printf("AI%u\n", frames_total);
+}
 
-    load_tileset();
-    slurp("ROM:level-a", UNIT_TYPE, LEVEL_BYTES);
+/* The intro screen: pick a level, a difficulty and a control scheme, then
+ * start. Four options at character rows 2 to 5; the selected one is flashed by
+ * cycling its colour, which is all the X16 does with it too. */
+static void intro_screen(void)
+{
+    unsigned char key;
 
-    video_init();
-    plat_sprites_init();
-    input_init();
-    load_bitmap("ROM:gamepic");
-    clear_chars();
+    plat_display_intro_screen();
+    plat_display_map_name();
+    plat_change_difficulty_level();
+    MENUY = 0;
+    printf("MENU\n");
 
-    /* INIT_GAME: nothing in inventory, everything is found by searching. */
-    for (i = 0; i < 13; i++)
-        KEY_MOVE_UP[i] = STANDARD_CONTROLS[i];
-    CONTROL = 0;
+    for (;;) {
+        wait_tick();
+        update_probe();
+
+        /* Walk the flash colours, as the X16's interrupt does every 7 frames. */
+        if (!SPRITECOLTIMER) {
+            SPRITECOLTIMER = 7;
+            SPRITECOLSTATE = (unsigned char)((SPRITECOLSTATE + 1) & 7);
+            plat_flash_menu_option(SPRITECOLCHART[SPRITECOLSTATE]);
+        }
+        SPRITECOLTIMER--;
+
+        key = plat_getin();
+        if (!key)
+            continue;
+
+        if (key == 0x91 || key == KEY_MOVE_UP[0]) {             /* up */
+            if (MENUY) {
+                plat_flash_menu_option(5);                      /* deselect */
+                MENUY--;
+                plat_play_sound(SFX_BEEP2);
+            }
+        } else if (key == 0x11 || key == KEY_MOVE_UP[1]) {      /* down */
+            if (MENUY < 3) {
+                plat_flash_menu_option(5);
+                MENUY++;
+                plat_play_sound(SFX_BEEP2);
+            }
+        } else if (key == 32 || key == 13) {                    /* space, return */
+            plat_play_sound(SFX_BEEP);
+            switch (MENUY) {
+            case 0:
+                return;                                         /* start */
+            case 1:
+                if (++SELECTED_MAP == 14)
+                    SELECTED_MAP = 0;
+                plat_display_map_name();
+                break;
+            case 2:
+                if (++DIFF_LEVEL == 3)
+                    DIFF_LEVEL = 0;
+                plat_change_difficulty_level();
+                break;
+            case 3:
+                if (++CONTROL == 3)
+                    CONTROL = 0;
+                break;
+            }
+        }
+    }
+}
+
+/* INIT_GAME. Nothing starts in inventory; everything is found by searching. */
+static void init_game(void)
+{
+    char name[16];
+    unsigned char i;
+
+    KEYS = AMMO_PISTOL = AMMO_PLASMA = 0;
+    INV_BOMBS = INV_EMP = INV_MEDKIT = INV_MAGNET = 0;
+    SELECTED_WEAPON = SELECTED_ITEM = 0;
+    MAGNET_ACT = PLASMA_ACT = BIG_EXP_ACT = 0;
+    CYCLES = SECONDS = MINUTES = HOURS = 0;
+
+    plat_display_game_screen();
+
+    /* "ROM:level-a" .. "ROM:level-n". The X16 patches the same last byte of
+     * its filename; here the name is short enough to just build. */
+    for (i = 0; i < 10; i++)
+        name[i] = "ROM:level-"[i];
+    name[10] = (char)('a' + SELECTED_MAP);
+    name[11] = 0;
+    slurp(name, UNIT_TYPE, LEVEL_BYTES);
+
     RANDOM = 1;
     PLAYER_DIRECTION = FACE_DOWN;
     PLAYER_ANIMATE = 0;
     UNIT_TYPE[0] = 1;
 
-    /* Stagger the unit timers so the AI does not run every robot on the same
-     * frame, exactly as SET_INITIAL_TIMERS does. */
+    /* SET_INITIAL_TIMERS: stagger them so the AI does not run every robot on
+     * the same tick. */
+    CLOCK_ACTIVE = 1;
     for (i = 1; i < 48; i++) {
         UNIT_TIMER_A[i] = i;
         UNIT_TIMER_B[i] = 0;
@@ -249,23 +319,38 @@ int main(void)
     plat_display_weapon();
     plat_display_item();
 
-    /* PRINT_INTRO_MESSAGE: the welcome line, on the console at start. */
+    /* PRINT_INTRO_MESSAGE. */
     SOURCE = INTRO_MESSAGE;
     plat_print_info();
-    update_probe();
+}
+
+int main(void)
+{
+    unsigned char i, key;
+
+    load_tileset();
+
+    video_init();
+    plat_sprites_init();
+    input_init();
+    clear_chars();
+
+    for (i = 0; i < 13; i++)
+        KEY_MOVE_UP[i] = STANDARD_CONTROLS[i];
+    CONTROL = 0;
+    DIFF_LEVEL = 1;
+    SELECTED_MAP = 0;
     last_frame = IRQ_FRAME;
+
+    intro_screen();
+    init_game();
+    frames_total = 0;
+
+    update_probe();
     printf("BRINGUP OK level-a player %u,%u\n", UNIT_LOC_X[0], UNIT_LOC_Y[0]);
 
-    CLOCK_ACTIVE = 1;
     for (;;) {
-        /* Once a frame, off the interrupt's counter. Everything that needs a
-         * portal lives out here rather than in the handler. */
-        while (last_frame == IRQ_FRAME)
-            ;
-        last_frame = IRQ_FRAME;
-        frame_counter++;
-        if (++frames_total == 60 || frames_total == 300)
-            printf("AI%u\n", frames_total);
+        wait_tick();
         update_probe();
 
         BACKGROUND_TASKS();

@@ -82,6 +82,9 @@ extern unsigned char IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE;
 extern unsigned char CYCLES, SECONDS, MINUTES, HOURS;
 extern unsigned char KEYS, INV_MAGNET;
 
+/* Only one of each may be running at a time. */
+extern unsigned char BIG_EXP_ACT, MAGNET_ACT, PLASMA_ACT;
+
 /* ---- inventory and selection ----------------------------------------- */
 extern unsigned char AMMO_PISTOL, AMMO_PLASMA;
 extern unsigned char INV_BOMBS, INV_EMP, INV_MEDKIT, INV_MAGNET;
@@ -121,6 +124,19 @@ extern unsigned char STANDARD_CONTROLS[13];
 #define SFX_PISTOL       13
 #define SFX_PLASMA       14
 #define SFX_SHOCK        15
+
+/* ---- the intro menu -------------------------------------------------- */
+extern unsigned char MENUY;             /* 0..3, which option is selected    */
+extern unsigned char MENUCOL;
+extern unsigned char SELECTED_MAP;      /* 0..13                             */
+extern unsigned char DIFF_LEVEL;        /* 0 easy, 1 normal, 2 hard          */
+extern unsigned char SPRITECOLSTATE, SPRITECOLTIMER;
+extern unsigned char SPRITECOLCHART[8];
+extern unsigned char MAP_NAMES[];       /* fourteen sixteen-byte names       */
+
+/* Screen layouts, run-length encoded 40x30 grids. */
+extern unsigned char INTRO_TEXT[], SCR_TEXT[], SCR_ENDGAME[], SCR_CUSTOM_KEYS[];
+extern unsigned char CINEMA_MESSAGE[], THREE_FACES[];
 
 /* Screen-code strings: 0 ends one, 255 forces a new line. */
 extern unsigned char INTRO_MESSAGE[];
