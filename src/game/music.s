@@ -15,102 +15,149 @@
 ;     39-48    set the tempo to (byte - 38) rows
 ;
 ; TEMPO_TIMER counts ticks between rows, so the engine is called once per tick
-; and does nothing most of the time.
+; and does nothing most of the time. A tempo command is the one row that does
+; not reload the timer, so it costs a single tick and the next row follows.
 ;
-; A sound effect interrupts the music: PLAY_SOUND saves the song's position and
-; STOP_SONG puts it back, which is why both share one voice. That is the PET's
-; constraint, not this machine's -- the RIA has eight oscillators -- but keeping
-; it means the timing and the priority rules are the original's.
+; The arpeggio modes in bits 6-7 are dead weight, faithfully carried: the PET
+; source has CYCLE_ARP commented out with the note "no music or sound effects
+; were composed to use this feature", and no byte of the 1240 shipped here sets
+; either bit. ARP_MODE and CHORD_ROOT are written and never read.
 ;
-; The only change is the output. The PET writes its VIA shift register at $E848
-; and $E84A; here the note number goes to the platform layer, which owns the
-; PSG registers in XRAM.
+; TWO CHANNELS. The PET had one voice, so a sound effect had to take the
+; music's: PLAY_SOUND parked the song's position and STOP_SONG put it back.
+; That is a property of the machine, not of the game, and it costs the effect
+; up to a full row of latency before it is heard -- it can only start when the
+; music's row does. The RIA has eight oscillators, so the two run side by side
+; on their own timers and an effect sounds on the next tick. Assembling with
+; PETSCII_AUTHENTIC_AUDIO defined puts the PET's behaviour back for A/B against
+; real hardware: both channels sound on oscillator 0 and the music holds still
+; while an effect plays.
+;
+; The only other change is the output. The PET writes its VIA shift register at
+; $E848 and $E84A; here the note number goes to the platform layer, which owns
+; the PSG registers in XRAM.
 
         .include "petscii.inc"
-        .import _plat_psg_note
+        .import _plat_psg_note, _plat_psg_effect
         .segment "CODE"
+
+CH_MUSIC  = 0
+CH_EFFECT = 1
 
 ; A = sound effect number. Lower numbers win, so an explosion is not cut off by
 ; a menu beep.
 PLAY_SOUND:
-        ldy     MUSIC_ON
-        cpy     #0
-        beq     PSND1
         ldy     SOUND_EFFECT
-        cpy     #$FF                    ; nothing playing: remember the song
-        bne     PSND1
-        ldy     CUR_PATTERN
-        sty     PATTERN_L_TEMP
-        ldy     CUR_PATTERN+1
-        sty     PATTERN_H_TEMP
-        ldy     DATA_LINE
-        sty     DATA_LINE_TEMP
-        ldy     TEMPO
-        sty     TEMPO_TEMP
-PSND1:  ldy     SOUND_EFFECT
         cpy     #$FF
-        beq     PSND2
+        beq     PSND2                   ; nothing playing
         cmp     SOUND_EFFECT
-        bcc     PSND2                   ; prioritise the lower number
-        beq     PSND2
-        rts
+        beq     PSND2                   ; the same effect again: restart it
+        bcs     PSND1                   ; a higher number: leave this one alone
 PSND2:  tay
-        ; CUR_PATTERN is two bytes and MUSIC_ROUTINE reads it from the interrupt,
-        ; so a tick landing between the halves would follow a pointer that is
-        ; half one pattern and half another. The PET had the same shape and the
-        ; same hazard; it costs two instructions to not have it.
+        ; MUSIC_ROUTINE reads this from the interrupt, and the pattern pointer
+        ; is two bytes, so a tick landing between the halves would follow a
+        ; pointer that is half one pattern and half another. The PET had the
+        ; same shape and the same hazard; it costs two instructions to not have
+        ; it.
         sei
         lda     SOUND_LIBRARY_L,y
-        sta     CUR_PATTERN
+        sta     CH_PATTERN_L+CH_EFFECT
         lda     SOUND_LIBRARY_H,y
-        sta     CUR_PATTERN+1
+        sta     CH_PATTERN_H+CH_EFFECT
         sty     SOUND_EFFECT
         lda     #0
-        sta     DATA_LINE
+        sta     CH_DATA_LINE+CH_EFFECT
+        ; Zero rather than TEMPO: the first row plays on the next tick instead
+        ; of waiting out a row belonging to whatever was playing before.
+        sta     CH_TEMPO_TIMER+CH_EFFECT
+        cli
+PSND1:  rts
+
+; Start a song: point the engine at a pattern and rewind it.
+; A = pattern low byte, X = high byte.
+START_MUSIC:
+        sei                             ; as PLAY_SOUND, and for the same reason
+        sta     CH_PATTERN_L+CH_MUSIC
+        stx     CH_PATTERN_H+CH_MUSIC
+        lda     #0
+        sta     CH_DATA_LINE+CH_MUSIC
+        sta     CH_TEMPO_TIMER+CH_MUSIC
+        lda     #1
+        sta     MUSIC_ON
         cli
         rts
 
-; One tick of the engine. Called from the VSYNC interrupt, sixty times a second,
-; exactly where the PET calls it.
+STOP_MUSIC:
+        lda     #0
+        sta     MUSIC_ON
+        ldx     #CH_MUSIC
+        stx     CHANNEL
+        lda     #0
+        jmp     PSG_NOTE                ; release the voice
+
+; One tick of the engine. Called from the VSYNC interrupt, sixty times a
+; second, exactly where the PET calls it.
 MUSIC_ROUTINE:
+        ldx     #CH_EFFECT
+        jsr     TICK_CHANNEL
+        ldx     #CH_MUSIC
+        ; fall through
+
+; One tick of one channel. X = channel.
+TICK_CHANNEL:
+        stx     CHANNEL                 ; X survives to PS10; only A is used here
+        cpx     #CH_MUSIC
+        beq     PS02
+        lda     SOUND_EFFECT            ; an effect plays whether or not music is on
+        cmp     #$FF
+        beq     PS08
+        jmp     PS10
+PS02:   lda     MUSIC_ON                ; is there a song?
+        beq     PS08
+.ifdef PETSCII_AUTHENTIC_AUDIO
+        ; One voice, so the music holds where it is until the effect is done.
+        ; The PET reached the same place by parking the song's position in
+        ; PATTERN_*_TEMP and restoring it afterwards; simply not ticking is the
+        ; same thing, and does not need the four variables.
         lda     SOUND_EFFECT
         cmp     #$FF
-        bne     PS10
-        lda     MUSIC_ON
-        cmp     #1
-        beq     PS10
-        rts
-PS10:   lda     TEMPO_TIMER
-        cmp     #0
+        bne     PS08
+.endif
+        jmp     PS10
+PS08:   rts
+
+PS10:   lda     CH_TEMPO_TIMER,x
         beq     PS15
-        dec     TEMPO_TIMER
+        dec     CH_TEMPO_TIMER,x
         rts
-PS15:   ldy     DATA_LINE
+PS15:   lda     CH_PATTERN_L,x          ; read this row through zero page
+        sta     CUR_PATTERN
+        lda     CH_PATTERN_H,x
+        sta     CUR_PATTERN+1
+        ldy     CH_DATA_LINE,x
         lda     (CUR_PATTERN),y
-        cmp     #0                      ; a blank row holds the note
-        bne     PS20
-        lda     TEMPO
-        sta     TEMPO_TIMER
-        inc     DATA_LINE
-        rts
+        beq     NEXT_ROW                ; a blank row holds the note
 PS20:   cmp     #37                     ; end of pattern
-        bne     PS21
-        jmp     STOP_SONG
-PS21:   cmp     #38                     ; note off
+        beq     END_PATTERN
+        cmp     #38                     ; note off
         bne     PS22
         lda     #0
         sta     ARP_MODE
-        jsr     _plat_psg_note          ; note 0 silences the voice
-PS22:   cmp     #38                     ; a tempo command?
+        jsr     PSG_NOTE                ; A = 0 releases the voice
+        ldx     CHANNEL                 ; the call clobbered it
+        jmp     NEXT_ROW                ; and costs a row, as a note does
+PS22:   cmp     #39                     ; a tempo command, 39-48?
         bcc     PS23
         cmp     #49
         bcs     PS23
         sec
         sbc     #38
-        sta     TEMPO
-        inc     DATA_LINE
+        sta     CH_TEMPO,x
+        ; The one row that does not reload the timer: TEMPO_TIMER is already
+        ; zero, so the next tick takes the row after this one.
+        inc     CH_DATA_LINE,x
         rts
-PS23:   ; play a note. The top two bits are the arpeggio mode, the low six the
+PS23:   ; Play a note. The top two bits are the arpeggio mode, the low six the
         ; note number.
         tay
         lsr     a
@@ -123,53 +170,41 @@ PS23:   ; play a note. The top two bits are the arpeggio mode, the low six the
         tya
         and     #%00111111
         sta     CHORD_ROOT
-        jsr     _plat_psg_note
-        lda     TEMPO
-        sta     TEMPO_TIMER
-        inc     DATA_LINE
+        jsr     PSG_NOTE
+        ldx     CHANNEL
+NEXT_ROW:
+        lda     CH_TEMPO,x
+        sta     CH_TEMPO_TIMER,x
+        inc     CH_DATA_LINE,x
         rts
 
-; End of a sound effect: silence, then put the song back where it was.
+; Byte 37. The songs are 256 bytes and DATA_LINE wraps, so a song only reaches
+; this if it was written to stop -- the win and lose jingles are.
+END_PATTERN:
 STOP_SONG:
         lda     #0
-        jsr     _plat_psg_note
-        lda     #$FF
+        jsr     PSG_NOTE                ; release the voice
+        ldx     CHANNEL
+        cpx     #CH_MUSIC
+        bne     STSN1
+        lda     #0
+        sta     MUSIC_ON
+        rts
+STSN1:  lda     #$FF
         sta     SOUND_EFFECT
-        lda     TEMPO
-        sta     TEMPO_TIMER
-        lda     MUSIC_ON
-        cmp     #1
-        beq     STSN1
-        rts
-STSN1:  ldy     PATTERN_L_TEMP
-        sty     CUR_PATTERN
-        ldy     PATTERN_H_TEMP
-        sty     CUR_PATTERN+1
-        ldy     DATA_LINE_TEMP
-        sty     DATA_LINE
-        ldy     TEMPO_TEMP
-        sty     TEMPO
         rts
 
-; Start a song: point the engine at a pattern and rewind it.
-; A = pattern low byte, X = high byte.
-START_MUSIC:
-        sei                             ; as PLAY_SOUND, and for the same reason
-        sta     CUR_PATTERN
-        stx     CUR_PATTERN+1
-        lda     #0
-        sta     DATA_LINE
-        sta     TEMPO_TIMER
-        lda     #1
-        sta     MUSIC_ON
-        cli
-        rts
-
-STOP_MUSIC:
-        lda     #0
-        sta     MUSIC_ON
-        jsr     _plat_psg_note
-        rts
+; A = note, played on the channel in CHANNEL. Note 0 releases the voice.
+; Nothing here touches A.
+PSG_NOTE:
+.ifdef PETSCII_AUTHENTIC_AUDIO
+        jmp     _plat_psg_note          ; one voice for both channels
+.else
+        ldx     CHANNEL
+        beq     PSGN1
+        jmp     _plat_psg_effect
+PSGN1:  jmp     _plat_psg_note
+.endif
 
 ; Sound effect number to pattern, in the X16's numbering because that is what
 ; every JSR PLAY_DIGI_SOUND site in the ported code names. Several of the X16's

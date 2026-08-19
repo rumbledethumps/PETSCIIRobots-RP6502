@@ -338,7 +338,8 @@ int main(void)
      * the PSG registers belong to the interrupt. */
     psg_init();
     SOUND_EFFECT = 0xFF;                /* nothing playing */
-    TEMPO = 7;
+    CH_TEMPO[0] = CH_TEMPO[1] = 7;      /* music and effects; every pattern
+                                           sets its own on the first row */
 
     /* Only now: the handler ticks the sound engine and writes the PSG, so
      * everything it touches has to exist first. Writing the register sets the

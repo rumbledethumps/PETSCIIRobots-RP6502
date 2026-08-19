@@ -1,0 +1,58 @@
+# Music and sound effects on separate oscillators.
+#
+# The PET had one voice, so PLAY_SOUND parked the song's position and STOP_SONG
+# put it back -- an effect could only begin when the music's row did, and the
+# music went silent for its duration. The RIA has eight oscillators, so this
+# port gives effects their own and both run on their own timers.
+#
+# Oscillator 0 is at XRAM $FF00 and oscillator 1 at $FF08, eight bytes each:
+# frequency as hertz times three, duty, the two envelope bytes, waveform and
+# release, then the pan/gate byte whose bit 0 is the gate.
+#
+# Engine state in RAM: CH_TEMPO_TIMER $7402, CH_TEMPO $7404, CH_DATA_LINE $7406
+# -- two bytes each, the music first -- then the pattern pointers, CHANNEL
+# $740C, MUSIC_ON $740D and SOUND_EFFECT $740E.
+
+wait "MENU"
+run 30
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 60
+
+# In game with the level music playing and no effect. The two oscillators are
+# already distinguishable by timbre alone: the music is a square held at a
+# steady level ($80 $20 $20 $11), the effect voice a thin pulse that decays to
+# a quieter sustain and releases fast ($30 $10 $30 $13). Effects have to cut
+# through a sustained note now that the note no longer stops for them.
+peek $740D $01 $FF
+peek xram:$FF02 $80 $20 $20 $11 $01
+peek xram:$FF0A $30 $10 $30 $13 $00
+
+# F1 cycles the weapon, which is SFX_CYCLEWEAPON -- effect 3.
+press f1
+run 2
+release f1
+run 3
+
+# The effect is sounding on oscillator 1...
+peek $740E $03
+peek xram:$FF0E $01
+# ...and the music is untouched on oscillator 0. This is the whole point: under
+# the PET's arrangement these six bytes would now be the effect's.
+peek xram:$FF00 $56 $04 $80 $20 $20 $11 $01
+
+# Six frames on, the song has moved to its next note while the effect is still
+# running. Two timers, neither waiting for the other.
+run 6
+peek $7406 $08
+peek xram:$FF00 $DD $03
+peek $740E $03
+
+# The effect ends on its own and releases its own voice. SOUND_EFFECT going
+# back to $FF is the only thing STOP_SONG has left to do for it; there is no
+# song position to restore any more.
+run 30
+peek $740E $FF
+peek xram:$FF0E $00

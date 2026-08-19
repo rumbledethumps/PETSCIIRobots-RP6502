@@ -21,6 +21,19 @@ target_sources(robots PRIVATE
     game/platform_bridge.s    # the AI's calls into the platform layer
 )
 target_include_directories(robots PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+
+# The PET had one voice, so a sound effect had to stop the music and wait for
+# its row. This machine has eight oscillators and does not, which is the better
+# game but not the original one. Turn this on to put the PET's behaviour back
+# and A/B the two against real hardware; see the header of game/music.s.
+option(PETSCII_AUTHENTIC_AUDIO "Play music and sound effects on one voice, as the PET did" OFF)
+if(PETSCII_AUTHENTIC_AUDIO)
+    # Not target_compile_definitions: that becomes cl65's -D, which defines a
+    # symbol for the C preprocessor and never reaches ca65. Assembler symbols
+    # are a separate option, and SHELL: keeps its two words from being merged.
+    target_compile_options(robots PRIVATE
+        "$<$<COMPILE_LANGUAGE:ASM>:SHELL:--asm-define PETSCII_AUTHENTIC_AUDIO>")
+endif()
 add_dependencies(robots petscii_assets)
 
 # GET_TILE_FROM_MAP builds the map address arithmetically rather than by

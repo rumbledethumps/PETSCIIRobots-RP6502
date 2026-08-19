@@ -287,7 +287,14 @@ The pattern language: 0 rests, 1-36 play a note with an arpeggio mode in the top
 two bits, 37 ends, 38 is note off, 39-48 set the tempo. Songs are 256 bytes and
 `DATA_LINE` is a byte, so the wrap *is* the loop.
 
-Three things needed care:
+**The arpeggio modes are dead weight.** The bits are real and the port carries
+them, but nothing uses them: `CYCLE_ARP` is commented out in the PET source with
+Murray's note that "no music or sound effects were composed to use this feature,
+so might as well disable it", and none of the 1,240 bytes shipped here sets bit
+6 or bit 7. `ARP_MODE` and `CHORD_ROOT` are written and never read. Describing
+this engine as having arpeggio overstates it -- there is nothing to hear.
+
+Four things needed care:
 
 - **The engine ticks from the VSYNC interrupt**, where the PET calls it. Its
   output goes through the PSG registers in XRAM, so it runs inside the portal
@@ -302,7 +309,45 @@ Three things needed care:
   pattern and half another. The PET has the same shape and the same hazard; it
   costs an `sei`/`cli` pair to not have it.
 
-A sound effect still interrupts the music and restores it afterwards, because
-both share one voice. That is the PET's constraint rather than this machine's --
-the RIA has eight oscillators -- but keeping it keeps the timing and the
-priority rules the original's.
+- **A `JSR` does not preserve A, and the original depends on it.** The note-off
+  row silences the PET by storing the zero already in the accumulator, then
+  falls through into the tempo test still holding it, so it plays note zero and
+  advances the row. Routing the output through a subroutine breaks that: each of
+  the 104 note-off rows was then read as whatever the call happened to leave
+  behind, which usually landed in the 39-48 tempo range and rewrote `TEMPO`. The
+  symptom was a tune that dragged and lurched. `TEMPO` measured 0 through the
+  intro song with the bug and a steady 7 without it. An explicit `lda #0`
+  restores the invariant the fallthrough assumes.
+
+### Two voices, not one
+
+The PET had a single voice, so a sound effect had to take the music's:
+`PLAY_SOUND` parked the song's position in four `_TEMP` variables and
+`STOP_SONG` put it back. Two costs come with that. The music stops for the
+duration of every beep, and -- because `PLAY_SOUND` does not reset
+`TEMPO_TIMER` -- the effect cannot begin until the music's current row ends, up
+to seven frames later. On a machine with eight oscillators neither is worth
+reproducing by default.
+
+So the engine state is two channels wide, index 0 the music and index 1 the
+effects, each with its own tempo, timer, row and pattern pointer.
+`MUSIC_ROUTINE` ticks both. `PLAY_SOUND` writes the effect channel and zeroes
+its timer, so an effect sounds on the next tick rather than waiting out someone
+else's row. The four `_TEMP` variables are gone; there is no longer a position
+to save.
+
+The effect voice also gets its own timbre -- a narrower pulse, a faster release
+-- since it no longer announces itself by the music stopping. That is the one
+piece of design the PET data cannot supply: it only ever named notes.
+
+Configuring with `-DPETSCII_AUTHENTIC_AUDIO=ON` puts the PET's arrangement back
+for A/B against real hardware: both channels sound on oscillator 0 and the music
+channel simply does not tick while an effect plays, which is what saving and
+restoring the position amounted to. It is an assembler symbol, so it goes to
+cl65 as `--asm-define` -- `target_compile_definitions` becomes `-D`, which
+defines a C preprocessor symbol that ca65 never sees, and the flag silently does
+nothing.
+
+`tests/emu/audio_channels.txt` covers both halves: that an effect sounds on
+oscillator 1 while the music holds oscillator 0 and keeps advancing its own row,
+and that the effect ends and releases its own voice.

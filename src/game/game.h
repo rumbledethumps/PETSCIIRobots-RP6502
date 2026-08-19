@@ -145,7 +145,8 @@ extern unsigned char MAP_TRANSLATION_TABLE[256];
 /* ---- the sound engine ------------------------------------------------ */
 extern unsigned char MUSIC_ON;          /* 1 = a song is playing            */
 extern unsigned char SOUND_EFFECT;      /* $FF = none                       */
-extern unsigned char TEMPO, ARP_MODE, CHORD_ROOT;
+extern unsigned char CH_TEMPO[2];       /* [0] music, [1] sound effects     */
+extern unsigned char ARP_MODE, CHORD_ROOT;
 extern unsigned char NOTE_FREQ_PSG[];   /* note -> hertz times three        */
 
 extern unsigned char INTRO_MUSIC[], WIN_MUSIC[], LOSE_MUSIC[];

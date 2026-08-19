@@ -1,8 +1,9 @@
 /* The RIA PSG, playing the PET engine's notes.
  *
- * Eight oscillators of eight bytes each, live in XRAM. The engine only uses one
- * -- the PET had a single voice and sharing it is what makes a sound effect
- * interrupt the music -- but the block is enabled whole.
+ * Eight oscillators of eight bytes each, live in XRAM. The engine uses two:
+ * oscillator 0 for the music and oscillator 1 for sound effects, so an effect
+ * no longer has to take the music's voice the way it did on the PET. An
+ * PETSCII_AUTHENTIC_AUDIO build routes both to oscillator 0 instead.
  *
  * Per oscillator:
  *
@@ -28,6 +29,7 @@
 
 #define OSC_BYTES 8
 #define OSC_MUSIC 0
+#define OSC_EFFECT 1
 
 /* Portal 1 throughout. plat_psg_note is only ever called from the VSYNC
  * interrupt, which saves and restores portal 1 around everything it does, so
@@ -35,12 +37,25 @@
  * interrupt is enabled, which is why it may use portal 1 too. */
 
 /* A square wave, struck hard and held: instant attack, sustain equal to peak,
- * short release. That is as close as a PSG gets to the PET's raw gated square. */
-#define DUTY        128
-#define VOL_ATTACK  0x20        /* attenuation 2, fastest attack   */
-#define VOL_DECAY   0x20        /* sustain at the same level       */
-#define WAVE_RELEASE 0x11       /* square, 24 ms release           */
+ * short release. That is as close as a PSG gets to the PET's raw gated square,
+ * and it is what the music uses.
+ *
+ * Effects get their own voice now, which means they no longer announce
+ * themselves by the music stopping. A narrower pulse and a faster release give
+ * them a harder edge so they cut through a held note instead of blending into
+ * it -- the one piece of timbre design the PET data cannot supply, since it
+ * only ever named notes. */
 #define PAN_CENTRE  0x00        /* centre, gate clear              */
+
+#define MUSIC_DUTY          128 /* square                          */
+#define MUSIC_VOL_ATTACK    0x20        /* attenuation 2, fastest attack */
+#define MUSIC_VOL_DECAY     0x20        /* sustain at the same level     */
+#define MUSIC_WAVE_RELEASE  0x11        /* square, 24 ms release         */
+
+#define EFFECT_DUTY         48  /* a thin pulse: brighter, more harmonics */
+#define EFFECT_VOL_ATTACK   0x10        /* attenuation 1, fastest attack */
+#define EFFECT_VOL_DECAY    0x30        /* decays to a quieter sustain   */
+#define EFFECT_WAVE_RELEASE 0x13        /* square, ~6 ms release         */
 
 void psg_init(void)
 {
@@ -55,14 +70,18 @@ void psg_init(void)
     xreg(0, 1, 0x00, XR_PSG);
 }
 
-/* The engine's only output. Note 0 releases the voice; anything else starts a
- * new note at that pitch. */
-void __fastcall__ plat_psg_note(unsigned char note)
+/* Note 0 releases the voice; anything else starts a new note at that pitch.
+ * osc is a constant at both call sites, so cc65 folds the address arithmetic
+ * and this costs no more than the single-oscillator version did. */
+static void psg_note(unsigned char osc, unsigned char note,
+                     unsigned char duty, unsigned char vol_attack,
+                     unsigned char vol_decay, unsigned char wave_release)
 {
     unsigned freq;
+    unsigned base = XR_PSG + osc * OSC_BYTES;
 
     if (!note || note > 36) {
-        RIA.addr1 = XR_PSG + OSC_MUSIC * OSC_BYTES + 6;
+        RIA.addr1 = base + 6;
         RIA.step1 = 1;
         RIA.rw1 = PAN_CENTRE;           /* gate low: release */
         return;
@@ -70,15 +89,29 @@ void __fastcall__ plat_psg_note(unsigned char note)
 
     freq = ((unsigned *)NOTE_FREQ_PSG)[note];
 
-    RIA.addr1 = XR_PSG + OSC_MUSIC * OSC_BYTES;
+    RIA.addr1 = base;
     RIA.step1 = 1;
     RIA.rw1 = (unsigned char)(freq & 0xFF);
     RIA.rw1 = (unsigned char)(freq >> 8);
-    RIA.rw1 = DUTY;
-    RIA.rw1 = VOL_ATTACK;
-    RIA.rw1 = VOL_DECAY;
-    RIA.rw1 = WAVE_RELEASE;
+    RIA.rw1 = duty;
+    RIA.rw1 = vol_attack;
+    RIA.rw1 = vol_decay;
+    RIA.rw1 = wave_release;
     RIA.rw1 = PAN_CENTRE;               /* gate low... */
-    RIA.addr1 = XR_PSG + OSC_MUSIC * OSC_BYTES + 6;
+    RIA.addr1 = base + 6;
     RIA.rw1 = PAN_CENTRE | 1;           /* ...then high, which strikes the note */
+}
+
+/* The music channel. */
+void __fastcall__ plat_psg_note(unsigned char note)
+{
+    psg_note(OSC_MUSIC, note, MUSIC_DUTY, MUSIC_VOL_ATTACK,
+             MUSIC_VOL_DECAY, MUSIC_WAVE_RELEASE);
+}
+
+/* The sound effect channel. */
+void __fastcall__ plat_psg_effect(unsigned char note)
+{
+    psg_note(OSC_EFFECT, note, EFFECT_DUTY, EFFECT_VOL_ATTACK,
+             EFFECT_VOL_DECAY, EFFECT_WAVE_RELEASE);
 }
