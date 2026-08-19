@@ -82,3 +82,57 @@ asserting the original behaviour first:
   `DISPLAY_WEAPON`.
 - `EXEC05`/`EXEC06` fall through, so "cycle map" also runs the difficulty test.
 - `IRQ20` has `STA KEYSOFF` commented out, so `KEYSOFF` free-runs.
+
+## The whole of BACKGROUND_TASKS.ASM
+
+`src/game/background_tasks.s` is the complete file — the dispatcher and all 24
+unit types — converted by `tools/convert/acme2ca65.py` and then
+`tools/convert/port_zeropage.py`. It is the only part of the port that came
+across whole, because it is the part David Murray deliberately kept
+machine-independent across the C64, PET, VIC-20 and X16.
+
+`src/game/window.s` and `src/game/transporter.s` hold the routines the AI calls
+that lived in the X16's machine-specific file but are pure logic:
+`CACULATE_AND_REDRAW`, `MAP_PRE_CALCULATE`, `CHECK_FOR_WINDOW_REDRAW`, and
+`DEMATERIALIZE`. `src/game/platform_bridge.s` forwards the rest to C.
+
+### The zero page remap, and the form that is easy to miss
+
+The file keeps two pointers in fixed low zero page, which cc65's runtime owns:
+
+    $02/$03 -> SOURCE    the message pointer PRINT_INFO reads
+    $04/$05 -> MAP_PTR   the map pointer GET_TILE_FROM_MAP builds
+
+The first attempt substituted only the direct forms, `LDA $04` and `STA $04`,
+and missed the sixteen **indirect** ones, `LDA ($04),Y`. The result stores
+through `MAP_PTR` and reads through cc65's `$04`, so `GET_TILE_FROM_MAP` returns
+whatever the C runtime happened to leave there. That does not present as a bad
+address: the player simply stops walking, because the tile lookup returns a
+number whose attributes say the way is blocked. Two hours of the map, the unit
+arrays and `TILE_ATTRIB` all checking out against their source files.
+
+`port_zeropage.py` now substitutes at the operand level, skips immediates
+(`#$04` is the number four), and refuses to write a file that still names low
+zero page in any addressing mode. `tests/reference/verify_conversion.py` runs
+the same check over the committed sources, so a hand-edit cannot reintroduce it.
+
+### A fixed bug
+
+`DEMATERIALIZE` (`x16Robots.ASM:4817`) loads X with 40 as a VERA register value
+and then, still holding 40, does `STA UNIT_TIMER_A,X` — so it sets slot 40's
+timer instead of its own. Slot 40 is in the 32-47 band, which holds doors and
+elevators, so on the X16 a transporter in use nudges whatever door occupies that
+slot. The surrounding code says plainly what was meant, and the 40 is an
+artifact of VERA writes this port does not have, so it is `LDX UNIT` here.
+
+### What the platform layer still stubs
+
+These are real entry points the AI calls; they return cleanly and do nothing
+yet. Listed so nobody mistakes a silent one for a working one:
+
+| stub | lands in |
+|---|---|
+| `plat_play_sound` | M7, the PET music engine on the RIA PSG |
+| `plat_print_info` | M5, the three-line message console |
+| `plat_display_item`, `plat_display_player_health` | M5, the HUD |
+| `plat_elevator_select` | M6, the elevator UI |

@@ -1,3 +1,6 @@
+        .ifndef PETSCII_INC
+PETSCII_INC = 1
+
 ; Shared declarations for the ported game logic.
 ;
 ; The routines below are David Murray's, converted from ACME to ca65 by
@@ -20,11 +23,27 @@
 ; ---- tileset ------------------------------------------------------------
         .global DESTRUCT_PATH, TILE_ATTRIB
 
+; ---- more game state ----------------------------------------------------
+        .globalzp SOURCE, TEMP_A, TEMP_B, TEMP_C, TEMP_D
+        .globalzp MAP_WINDOW_X, MAP_WINDOW_Y, REDRAW_WINDOW, SCREEN_SHAKE
+        .globalzp PRECALC_COUNT
+        .global UNIT_TIMER_A, UNIT_TIMER_B, UNIT_TILE, EXP_BUFFER, MAP_PRECALC
+        .global BGTIMER1, BGTIMER2, BIG_EXP_ACT, MAGNET_ACT, PLASMA_ACT
+        .global KEYS, INV_MAGNET, BORDER
+
+; ---- messages -----------------------------------------------------------
+        .global MSG_TERMINATED, MSG_TRANS1, MSG_ELEVATOR, MSG_LEVELS
+
 ; ---- routines -----------------------------------------------------------
         .global GET_TILE_FROM_MAP, PLOT_TILE_TO_MAP, CHECK_FOR_UNIT
         .global REQUEST_WALK_UP, REQUEST_WALK_DOWN
         .global REQUEST_WALK_LEFT, REQUEST_WALK_RIGHT
         .global GENERATE_RANDOM_NUMBER
+        .global BACKGROUND_TASKS, UNIT_AI, AILP
+        .global CACULATE_AND_REDRAW, MAP_PRE_CALCULATE, CHECK_FOR_WINDOW_REDRAW
+        .global DEMATERIALIZE
+        .global DRAW_MAP_WINDOW, PLAY_DIGI_SOUND, PRINT_INFO
+        .global DISPLAY_ITEM, DISPLAY_PLAYER_HEALTH, ELEVATOR_SELECT
 
 ; MOVE_TYPE bits, tested as (TILE_ATTRIB & MOVE_TYPE) == MOVE_TYPE
 MOVE_WALK       = %00000001
@@ -38,3 +57,5 @@ ATTR_DESTRUCTIBLE = %00001000
 ATTR_SEETHROUGH   = %00010000
 ATTR_DESTINATION  = %00100000
 ATTR_SEARCHABLE   = %01000000
+
+        .endif

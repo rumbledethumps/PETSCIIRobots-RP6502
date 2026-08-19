@@ -1,14 +1,17 @@
 add_executable(robots)
 target_sources(robots PRIVATE
     main.c
+    platform.c
     # David Murray's game logic, converted from ACME to ca65. These are the
     # original instructions, not a transliteration, so they behave exactly as
     # the X16 build does.
+    game/background_tasks.s   # the AI dispatcher and all 24 unit types
+    game/window.s             # what should be on screen, not how to draw it
+    game/transporter.s        # unit type 23, kept apart as the X16 did
+    game/messages.s
     game/globals.s
-    game/map.s
-    game/move.s
-    game/rng.s
-    game/capi.s
+    game/capi.s               # cc65 name aliasing, the only file that knows C exists
+    game/platform_bridge.s    # the AI's calls into the platform layer
 )
 target_include_directories(robots PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 add_dependencies(robots petscii_assets)

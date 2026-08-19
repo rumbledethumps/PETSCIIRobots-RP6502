@@ -24,6 +24,16 @@ MOVE_RESULT:    .res 1          ; 1 = the move happened
 UNIT_FIND:      .res 1          ; 255 = no unit present
 RANDOM:         .res 1          ; 8-bit LFSR state
 MAP_PTR:        .res 2          ; was the X16's hardcoded $04/$05
+SOURCE:         .res 2          ; was the X16's hardcoded $02/$03: message pointer
+TEMP_A:         .res 1          ; scratch, shared by several routines
+TEMP_B:         .res 1
+TEMP_C:         .res 1
+TEMP_D:         .res 1
+MAP_WINDOW_X:   .res 1          ; top-left of the visible map window
+MAP_WINDOW_Y:   .res 1
+REDRAW_WINDOW:  .res 1          ; 1 = the window needs redrawing
+SCREEN_SHAKE:   .res 1          ; 1 = shake the character plane this frame
+PRECALC_COUNT:  .res 1          ; index into MAP_PRECALC while drawing
 
 ; ---- level data ---------------------------------------------------------
         .segment "LEVELDATA"
@@ -50,3 +60,30 @@ MAP:            .res 128 * 64
 
 DESTRUCT_PATH:  .res 256        ; tile -> the tile it becomes when destroyed
 TILE_ATTRIB:    .res 256        ; ATTR_* bits
+
+; ---- per-unit working state ---------------------------------------------
+; Not part of a level file: rebuilt when a level starts.
+UNIT_TIMER_A:   .res 64         ; primary AI timer, counts down to an action
+UNIT_TIMER_B:   .res 64         ; secondary timer
+UNIT_TILE:      .res 32         ; the tile each visible unit currently draws as
+EXP_BUFFER:     .res 16         ; tiles an explosion covered, to restore after
+
+; MAP_PRE_CALCULATE writes the units visible in the 11x7 window here, so the
+; draw loop never has to search for them.
+MAP_PRECALC:    .res 77
+
+; ---- game flags ---------------------------------------------------------
+BGTIMER1:       .res 1          ; set once a frame, cleared by the main loop
+BGTIMER2:       .res 1          ; counts down to zero and stays there
+BIG_EXP_ACT:    .res 1          ; only one big explosion may run at a time
+MAGNET_ACT:     .res 1
+PLASMA_ACT:     .res 1
+KEYS:           .res 1          ; bit 0 spade, bit 1 heart, bit 2 star
+INV_MAGNET:     .res 1          ; magnets carried
+
+        .segment "DATA"
+
+; The border flash. Index 0 is the countdown; the rest is the colour ramp the
+; IRQ walked on the X16. Kept as one array because the original decrements
+; BORDER and then indexes BORDER,X with it.
+BORDER:         .byte 0, 0, 8, 15, 25, 31, 31, 25, 15, 8, 0

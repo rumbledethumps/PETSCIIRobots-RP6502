@@ -1,0 +1,41 @@
+# Unit AI: the whole of BACKGROUND_TASKS.ASM, all 24 unit types, running as
+# David Murray's own instructions.
+#
+# The probe carries a checksum over every live unit's type and position, so
+# "the AI is running" is a peek rather than a screenshot. The emulator is
+# deterministic under --seed 1 and the RNG is seeded to a fixed value, so these
+# are exact: change an AI routine and they move, which is the point.
+#
+# Slot 0 is the player and has no AI. The dispatcher walks slots 1..63,
+# decrements each unit's timer, and runs its routine when the timer hits zero.
+
+wait "BRINGUP OK"
+
+# 16 live robots in level-a, and nothing drawn over the terrain yet: the player
+# starts 25 tiles from the nearest one.
+peek xram:$FE07 $10
+peek xram:$FE0C $19 $4B $00
+
+# The hoverbots patrol, so the checksum moves.
+run 60
+peek xram:$FE0C $84 $40 $00
+run 240
+peek xram:$FE0C $BE $4F $00
+
+# Walk to the hoverbot patrolling at x=36 and watch it appear in the window.
+# This is the unit overlay reaching the screen, not just the AI moving state:
+# MAP_PRE_CALCULATE has to find the robot inside the 11x7 window and
+# plot_transparent_tile has to draw its tile over the terrain.
+press l
+run 120
+release l
+run 4
+press i
+run 170
+release i
+run 20
+
+peek xram:$FE04 $25 $21
+peek xram:$FE0C $37 $4F $01
+
+shot "ai.png"

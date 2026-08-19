@@ -32,6 +32,14 @@ extern unsigned char RANDOM;       /* LFSR state; seed it non-zero         */
 #pragma zpsym("UNIT_FIND")
 #pragma zpsym("RANDOM")
 
+extern unsigned char MAP_WINDOW_X, MAP_WINDOW_Y;  /* top-left of the window   */
+extern unsigned char REDRAW_WINDOW;               /* 1 = redraw is due        */
+extern unsigned char SCREEN_SHAKE;                /* 1 = shake this frame     */
+#pragma zpsym("MAP_WINDOW_X")
+#pragma zpsym("MAP_WINDOW_Y")
+#pragma zpsym("REDRAW_WINDOW")
+#pragma zpsym("SCREEN_SHAKE")
+
 #define MOVE_WALK  0x01
 #define MOVE_HOVER 0x02
 
@@ -54,6 +62,16 @@ extern unsigned char MAP[128 * 64];
 
 #define LEVEL_BYTES (8 * 64 + 128 * 64)     /* 8704, the whole level file */
 
+/* ---- per-unit working state ------------------------------------------ */
+extern unsigned char UNIT_TIMER_A[64], UNIT_TIMER_B[64];
+extern unsigned char UNIT_TILE[32];     /* the tile each visible unit draws as */
+extern unsigned char MAP_PRECALC[77];   /* units inside the 11x7 window        */
+
+/* Set once a frame by the main loop; BACKGROUND_TASKS consumes it. On the X16
+ * this was the IRQ's job. */
+extern unsigned char BGTIMER1, BGTIMER2;
+extern unsigned char KEYS, INV_MAGNET;
+
 /* ---- tileset --------------------------------------------------------- */
 extern unsigned char DESTRUCT_PATH[256];
 extern unsigned char TILE_ATTRIB[256];
@@ -67,5 +85,11 @@ void REQUEST_WALK_DOWN(void);
 void REQUEST_WALK_LEFT(void);
 void REQUEST_WALK_RIGHT(void);
 void GENERATE_RANDOM_NUMBER(void); /* advances RANDOM                      */
+
+/* One pass of unit AI, gated on BGTIMER1, plus the window redraw it may ask
+ * for. Every unit in slots 1..63 whose timer has expired runs its routine. */
+void BACKGROUND_TASKS(void);
+void MAP_PRE_CALCULATE(void);      /* collect visible units into MAP_PRECALC */
+void CACULATE_AND_REDRAW(void);    /* centre the window on the player (sic)  */
 
 #endif

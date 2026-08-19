@@ -161,3 +161,21 @@ otherwise show up as the VGA quietly substituting its built-in code page.
 
 The 6502 routines themselves are small: `map.s`, `move.s` and `rng.s` together
 are about 300 bytes. Most of `CODE` is still the C platform layer.
+
+## M4 — the whole unit AI
+
+`BACKGROUND_TASKS.ASM` in full: the dispatcher and all 24 unit types, plus the
+window bookkeeping and the transporter.
+
+| segment | bytes | change |
+|---|---|---|
+| `CODE` | 11,028 | +5,282 |
+| `RODATA` + `DATA` | 1,270 | +859 |
+| `BSS` | 5,460 | |
+| `LEVELDATA` | 8,704 | |
+| **RAM used, `$0200–$69FF`** | **27,135** of 64,768 — **36.7 KB free** |
+
+The AI is 2,022 instructions of the original 6,133, and it cost 5.3 KB against
+the roughly 4.8 KB those instructions occupy in the X16 build — so the ported
+assembly is carrying its own weight, and the overhead is the C platform layer
+around it.

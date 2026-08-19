@@ -28,6 +28,16 @@
 #define PROBE_FRAME     9   /* wraps at 256                         */
 #define PROBE_WINDOW_X 10
 #define PROBE_WINDOW_Y 11
+/* A 16-bit checksum over every live unit's type and position. It changes the
+ * moment any robot moves, which makes "is the AI running" a peek rather than a
+ * screenshot, and with a fixed RNG seed it is reproducible enough to pin a
+ * whole AI pass as a regression. */
+#define PROBE_UNITS_LO 12
+#define PROBE_UNITS_HI 13
+/* Units the last redraw drew over the terrain, i.e. non-zero entries in
+ * MAP_PRECALC. Proves the unit overlay reached the screen, not just that the
+ * AI moved something. */
+#define PROBE_VISIBLE  14
 #define PROBE_SIZE     16
 
 #define PROBE_STATE_BOOT    0

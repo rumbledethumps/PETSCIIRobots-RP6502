@@ -12,18 +12,11 @@
 #include <unistd.h>
 
 #include "game/game.h"
+#include "platform.h"
 #include "probe.h"
 #include "xram.h"
 
-/* TILESET.GFX, reorganised by tools/convert/conv_tiles.py: each game tile is
- * three character rows of six bytes -- glyph, colour, glyph, colour, glyph,
- * colour -- so a row is one address store and six portal writes. Colours are
- * pre-masked to $0F, which is what makes the playfield transparent over the
- * bitmap plane and what deletes nine AND #$0F from the X16's inner loop. */
-static unsigned char tile_cells[256 * 3 * 6];
-
 static unsigned char keyboard[32];
-static unsigned char map_window_x, map_window_y;
 static unsigned char player_direction = FACE_DOWN;
 static unsigned char player_animate;
 static unsigned char frame_counter;
@@ -73,7 +66,7 @@ static void load_tileset(void)
     int fd = open("ROM:tiles", O_RDONLY);
     if (fd < 0)
         die("ROM:tiles");
-    slurp_fd(fd, tile_cells, sizeof tile_cells);
+    slurp_fd(fd, tile_cells, 256 * 3 * 6);
     slurp_fd(fd, DESTRUCT_PATH, sizeof DESTRUCT_PATH);
     slurp_fd(fd, TILE_ATTRIB, sizeof TILE_ATTRIB);
     close(fd);
@@ -175,10 +168,22 @@ static void display_player_sprite(void)
 
 static void update_probe(void)
 {
-    unsigned char i, robots = 0;
-    for (i = 1; i < 28; i++)
+    unsigned char i, robots = 0, visible = 0;
+    unsigned sum = 0;
+    /* How many units the last redraw actually drew over the terrain. Zero is
+     * the normal state: level-a starts the player 25 tiles from the nearest
+     * robot, so this only becomes non-zero once he walks to one. */
+    for (i = 0; i < 77; i++)
+        if (MAP_PRECALC[i])
+            visible++;
+    for (i = 1; i < 28; i++) {
         if (UNIT_TYPE[i])
             robots++;
+        /* Weighted so a robot swapping places with another still shows up. */
+        sum += (unsigned)UNIT_TYPE[i] * 7u
+             + (unsigned)UNIT_LOC_X[i] * 31u
+             + (unsigned)UNIT_LOC_Y[i] * 131u;
+    }
     RIA.addr0 = XR_PROBE;
     RIA.step0 = 1;
     RIA.rw0 = PROBE_MAGIC_0;
@@ -191,8 +196,11 @@ static void update_probe(void)
     RIA.rw0 = robots;
     RIA.rw0 = RANDOM;
     RIA.rw0 = frame_counter;
-    RIA.rw0 = map_window_x;
-    RIA.rw0 = map_window_y;
+    RIA.rw0 = MAP_WINDOW_X;
+    RIA.rw0 = MAP_WINDOW_Y;
+    RIA.rw0 = sum & 0xFF;
+    RIA.rw0 = sum >> 8;
+    RIA.rw0 = visible;
 }
 
 static void clear_chars(void)
@@ -204,41 +212,6 @@ static void clear_chars(void)
         RIA.rw0 = 32;      /* PETSCII space */
         RIA.rw0 = 0;       /* background 0, foreground 0: fully transparent */
     }
-}
-
-/* One 24x24 game tile as three character rows of six bytes. */
-static void plot_tile(unsigned addr, unsigned char tile)
-{
-    const unsigned char *p = &tile_cells[(unsigned)tile * 18];
-    unsigned char row;
-    RIA.step0 = 1;
-    for (row = 0; row < 3; row++) {
-        RIA.addr0 = addr;
-        RIA.rw0 = *p++; RIA.rw0 = *p++;
-        RIA.rw0 = *p++; RIA.rw0 = *p++;
-        RIA.rw0 = *p++; RIA.rw0 = *p++;
-        addr += SCR_STRIDE;
-    }
-}
-
-static void draw_map_window(void)
-{
-    unsigned char tx, ty;
-    unsigned addr;
-    for (ty = 0; ty < MAP_WIN_TILES_H; ty++) {
-        for (tx = 0; tx < MAP_WIN_TILES_W; tx++) {
-            addr = CELL(MAP_WIN_COL + tx * 3, MAP_WIN_ROW + ty * 3);
-            plot_tile(addr, MAP[((unsigned)(map_window_y + ty) << 7)
-                                + map_window_x + tx]);
-        }
-    }
-}
-
-/* The window follows the player, who stays at viewport cell (5,3). */
-static void centre_window(void)
-{
-    map_window_x = UNIT_LOC_X[0] - 5;
-    map_window_y = UNIT_LOC_Y[0] - 3;
 }
 
 static void put_string(unsigned char col, unsigned char row,
@@ -276,7 +249,7 @@ static bool try_walk(void (*walk)(void))
 
 int main(void)
 {
-    unsigned char last_vsync, repeat = 0;
+    unsigned char last_vsync, repeat = 0, i;
     bool moved;
 
     load_tileset();
@@ -288,8 +261,14 @@ int main(void)
     clear_chars();
 
     RANDOM = 1;
-    centre_window();
-    draw_map_window();
+    /* Stagger the unit timers so the AI does not run every robot on the same
+     * frame, exactly as SET_INITIAL_TIMERS does on the X16. */
+    for (i = 1; i < 48; i++) {
+        UNIT_TIMER_A[i] = i;
+        UNIT_TIMER_B[i] = 0;
+    }
+    CACULATE_AND_REDRAW();
+    plat_draw_map_window();
     display_player_sprite();
 
     put_string(0, 27, "petscii robots rp6502", 5);
@@ -312,6 +291,12 @@ int main(void)
             continue;
         last_vsync = v;
         frame_counter++;
+
+        /* The X16 raised this from its VBLANK interrupt. Here the main loop is
+         * the frame, so it raises it before letting the AI run, and
+         * BACKGROUND_TASKS lowers it again. */
+        BGTIMER1 = 1;
+        BACKGROUND_TASKS();
         update_probe();
 
         read_keyboard();
@@ -345,8 +330,10 @@ int main(void)
         if (moved) {
             if (++player_animate == 3)
                 player_animate = 0;
-            centre_window();
-            draw_map_window();
+            /* Ask for a redraw rather than doing one: BACKGROUND_TASKS draws
+             * at most once a frame, so a move and a robot moving in the same
+             * frame cost one redraw between them, not two. */
+            CACULATE_AND_REDRAW();
         }
         /* Facing changes even when the way is blocked, as it does on the X16. */
         display_player_sprite();

@@ -12,6 +12,7 @@ every later difference is a change we made on purpose.
 Run directly, or via ctest as `reference-conversion`.
 """
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -77,8 +78,32 @@ def build(name: str, work: pathlib.Path) -> bytes:
     return binf.read_bytes()
 
 
+def check_no_raw_zeropage() -> int:
+    """No file under src/game/ may name low zero page by number.
+
+    cc65's runtime owns $00-$1F, so the ported sources use MAP_PTR and SOURCE
+    instead. Getting this wrong is quiet: a routine that stores through the new
+    pointer and reads through the old one looks like corrupt map data, not a bad
+    address, and the indirect form -- LDA ($04),Y -- is the one that is easy to
+    miss because it does not look like the direct form.
+    """
+    bad = []
+    pat = re.compile(r'(?<![#$0-9A-Fa-f])\$0[0-9A-Fa-f](?![0-9A-Fa-f])')
+    for path in sorted((ROOT / "src" / "game").glob("*.s")):
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            code = line.split(";", 1)[0]
+            if pat.search(code):
+                bad.append(f"  {path.name}:{n}: {code.strip()}")
+    if bad:
+        print("src/game references low zero page by number:")
+        print("\n".join(bad))
+        return 1
+    print("  src/game            no raw low zero page")
+    return 0
+
+
 def main() -> int:
-    failures = 0
+    failures = check_no_raw_zeropage()
     for name in PROGRAMS:
         ref_prg = PRG_DIR.get(name, ASSETS) / f"{name}.PRG"
         if not ref_prg.exists():
