@@ -46,7 +46,7 @@
 XR_CFG_CHARS = $E0A0
 
         .export _petscii_irq
-        .import _plat_animate_water
+        .import _plat_animate_water, _plat_flash_step
 
         .segment "CODE"
 
@@ -122,6 +122,12 @@ VBLANK_VIDEO:
         sty     RIA_ADDR1+1
         sta     RIA_RW1
         stx     RIA_RW1
+
+        ; The border and background flashers, which tint the bitmap palette's
+        ; entry 0. Inside the save because they write through this portal, and
+        ; in vblank because a palette entry changed part way down a frame shows
+        ; as a band across the picture.
+        jsr     _plat_flash_step
 
         ; One tick of the sound engine, where the PET calls it. Its only output
         ; is through the platform layer's PSG writes, which use this portal, so

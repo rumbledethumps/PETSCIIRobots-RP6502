@@ -4,6 +4,7 @@
 /* Called from src/game/platform_bridge.s. */
 void plat_draw_map_window(void);
 void plat_animate_water(void);
+void plat_flash_step(void);
 void __fastcall__ plat_play_sound(unsigned char effect);
 void plat_print_info(void);
 void plat_display_item(void);

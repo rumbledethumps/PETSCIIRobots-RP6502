@@ -137,6 +137,8 @@ extern unsigned char MAP_NAMES[];       /* fourteen sixteen-byte names       */
 /* Screen layouts, run-length encoded 40x30 grids. */
 extern unsigned char INTRO_TEXT[], SCR_TEXT[], SCR_ENDGAME[], SCR_CUSTOM_KEYS[];
 extern unsigned char CINEMA_MESSAGE[], THREE_FACES[];
+/* Index 0 counts down, 1..10 is the colour ramp the interrupt walks. */
+extern unsigned char BORDER[], BGFLASH[];
 
 /* One colour per tile for the live map, both nibbles the same because a map
  * tile is two pixels of a 4bpp bitmap. */

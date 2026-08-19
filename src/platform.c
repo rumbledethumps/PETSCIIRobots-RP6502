@@ -927,6 +927,60 @@ void plat_elevator_select(void)
 /* M6: the gamepad path. CONTROL is 0 or 1 here, so the AI never reaches this. */
 void plat_gamepad_read(void) { }
 
+/* The border and background flashers, from x16Robots.ASM 652-677.
+ *
+ * Both are one array whose index 0 is a countdown and whose remaining ten bytes
+ * are a colour ramp, and the interrupt walks the ramp backwards as the counter
+ * falls. On the X16 they wrote the two halves of VERA palette entry 0: BORDER
+ * the byte holding red, BGFLASH the byte holding green and blue. There is no
+ * border here, so both land on entry 0 of the bitmap palette, which is the
+ * black the playfield sits on -- the same thing the X16 was tinting.
+ *
+ * One difference worth stating. VERA takes four bits of red and ignores the
+ * high nibble of that byte, so its ramp -- 8, 15, 25, 31 -- actually reached
+ * the screen as 8, 15, 9, 15: a jump backwards in the middle of a fade the
+ * author clearly wrote as monotonic and symmetric. RP6502 palettes are RGB555,
+ * so the five-bit value goes through as written and the fade is the one the
+ * table describes. The green and blue nibbles are doubled to fill five bits.
+ */
+#define PAL_ALPHA (1u << 5)             /* the opacity bit, per conv_palette.py */
+
+static unsigned char flashing;
+
+void plat_flash_step(void)
+{
+    unsigned char r = 0, gb = 0;
+    unsigned c;
+
+    if (BORDER[0]) {
+        r = BORDER[BORDER[0]];
+        BORDER[0]--;
+    }
+    if (BGFLASH[0]) {
+        gb = BGFLASH[BGFLASH[0]];
+        BGFLASH[0]--;
+    }
+
+    if (!r && !gb) {
+        /* Put the backdrop's opaque black back, once, on the way out. */
+        if (!flashing)
+            return;
+        flashing = 0;
+    } else {
+        flashing = 1;
+    }
+
+    c = PAL_ALPHA
+      | (r & 31u)
+      | ((unsigned)((gb >> 4) * 2u) << 6)
+      | ((unsigned)((gb & 15u) * 2u) << 11);
+
+    RIA.addr1 = XR_PAL_BITMAP;
+    RIA.step1 = 1;
+    RIA.rw1 = (unsigned char)(c & 0xFF);
+    RIA.rw1 = (unsigned char)(c >> 8);
+}
+
 /* Cycles entry 4 of the player's own palette, which is what the X16 achieved by
  * poking VERA palette entry 40 -- index 4 of the sprites drawn with palette
  * offset 1. Here it cannot reach the character plane. */

@@ -336,6 +336,29 @@ path on its own, because nothing puts a mobile unit inside the window near
 level-a's start -- doors and found objects are written into the map, not drawn
 over it.
 
+## The border and background flashes
+
+`BORDER` and `BGFLASH` are each one array whose index 0 is a countdown and whose
+remaining ten bytes are a colour ramp; the interrupt walks the ramp backwards as
+the counter falls. The X16 wrote them to the two halves of VERA palette entry 0
+-- `BORDER` the byte holding red, `BGFLASH` the byte holding green and blue.
+There is no border here, so both land on entry 0 of the bitmap palette, which is
+the black the playfield sits on: the same thing the X16 was tinting.
+
+One difference, deliberately. VERA takes four bits of red and ignores the high
+nibble of that byte, so the ramp 8, 15, 25, 31 reached the screen as 8, 15, 9,
+15 -- a jump backwards in the middle of a fade the author wrote as monotonic and
+symmetric. RP6502 palettes are RGB555, so the five-bit value goes through as
+written. The green and blue nibbles are doubled to fill five bits.
+
+Verified by forcing both counters at bring-up and reading the palette entry every
+frame: red ramps 0, 8, 15, 25, 31, 31, 25, 15, 8, 0 with blue and green
+alongside, the opacity bit stays set throughout, and entry 0 returns to opaque
+black on the way out. **Not covered by a shipped test**: the triggers are
+`USE_EMP`, the trash compactor reaching the player, and the player taking damage,
+and nothing in level-a's start area reaches any of them from a script. Same gap
+as the unit overlay above.
+
 ## Sound: the engine the X16 threw away
 
 The RP6502 has a PSG, not a sample player, so the right engine is the original
