@@ -233,6 +233,14 @@ static void pause_game(void)
     CLOCK_ACTIVE = 1;
 }
 
+/* The pad's own repeat acceleration. The original keeps one KEY_FAST because
+ * only one control scheme is live at a time; here both are, and sharing it made
+ * the keyboard slow whenever a pad was plugged in -- SC35 clears the flag when
+ * no pad direction is held, which is every frame someone is using the keyboard,
+ * so held keys never reached the fast rate. Measured at 8 squares in 120 frames
+ * with a pad connected against 15 without. They are separate now. */
+static unsigned char pad_fast;
+
 /* AFTER_MOVE_SNES. Not the same as the keyboard's AFTER_MOVE: the repeats are
  * 6 frames rather than 7, and it clears the direction latches so a held d-pad
  * has to be seen again by the next read. */
@@ -249,13 +257,13 @@ static void walk_pad(unsigned char facing, void (*request)(void))
         plat_display_player_sprite();
     }
 
-    if (KEY_FAST) {
+    if (pad_fast) {
         KEYTIMER = 6;
         NEW_BUTTONS[PAD_UP] = NEW_BUTTONS[PAD_DOWN] = 0;
         NEW_BUTTONS[PAD_LEFT] = NEW_BUTTONS[PAD_RIGHT] = 0;
     } else {
         KEYTIMER = 15;
-        KEY_FAST = 1;
+        pad_fast = 1;
     }
 }
 
@@ -304,7 +312,7 @@ static unsigned char gamepad_pass(void)
             walk_pad(FACE_DOWN, REQUEST_WALK_DOWN);
             return 1;
         }
-        KEY_FAST = 0;                   /* SC35: nothing held, slow repeat again */
+        pad_fast = 0;                   /* SC35: nothing held, slow repeat again */
     }
 
     /* SC40: the buttons, which do not wait for the timer. The four face

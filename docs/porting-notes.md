@@ -364,11 +364,22 @@ fire by position, the sticks are merged in -- and only reads the key queue if
 the pad did not act. It uses `plat_getin_keys` for that, the queue without the
 pad, since the pad has already had its turn.
 
-One trap worth recording: the pad's pass ends with `SC35`, which clears
-`KEY_FAST` when no direction is held. Running that every frame reset the
-*keyboard's* repeat acceleration, so held keys never reached the fast rate and
-two tests started failing. The pass now returns immediately when no pad is
-plugged in, which is also less work per frame.
+One trap, in two parts, both from the same cause: the original keeps a single
+`KEY_FAST` because only one scheme is live at a time, and here both are.
+
+The pad's pass ends with `SC35`, which clears `KEY_FAST` when no pad direction
+is held -- which is every frame someone is using the keyboard. First that broke
+two tests even with no pad attached, so the pass now returns immediately when
+none is plugged in, which is also less work per frame. Then the real one: with a
+pad actually connected, the keyboard was still being slowed to a crawl, because
+`SC35` was resetting its acceleration on every frame and held keys never reached
+the fast rate. Measured holding a direction for 120 frames: **8 squares with a
+pad connected against 15 without**.
+
+The pad has its own acceleration flag now and never touches the game's
+`KEY_FAST`. Same measurement after: 15 either way, and the pad's own repeat
+unchanged at 15 squares. Two live schemes need two flags; sharing one was a
+detail of the original that stopped being true the moment both ran at once.
 
 ## The controls menu, which did nothing
 
