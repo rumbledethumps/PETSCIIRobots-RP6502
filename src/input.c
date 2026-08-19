@@ -34,6 +34,7 @@
 
 #include "game/game.h"
 #include "input.h"
+#include "platform.h"
 #include "xram.h"
 
 /* Bits 0-3 of byte 0 are special: bit 0 means no key is pressed, bits 1-3 are
@@ -165,11 +166,10 @@ void plat_input_poll(void)
     held_n = j;
 }
 
-/* What KERNAL GETIN returned: the next key code, or zero if none is waiting.
- *
- * Polls the hardware at most once per frame, so calling this in a tight loop
- * neither misses a keypress nor turns one into a stream. */
-unsigned char plat_getin(void)
+/* The key queue alone, with no gamepad. The in-game loop wants this: the pad
+ * has already had its turn there, in gamepad_pass, where a button means more
+ * than a key code can carry. */
+unsigned char plat_getin_keys(void)
 {
     unsigned char code;
     if (q_head == q_tail)
@@ -220,4 +220,19 @@ void plat_key_repeat(void)
     }
     push(translate(held[held_n - 1]));
     KEYTIMER = REPEAT_FLOOR;
+}
+
+/* What KERNAL GETIN returned: the next key code, or zero if none is waiting --
+ * and a gamepad press if no key is.
+ *
+ * The merge belongs here rather than in each caller. The converted assembly
+ * calls GETIN from MOVE_OBJECT and USER_SELECT_OBJECT and chooses its own pad
+ * path on CONTROL == 2, which this port no longer sets, so without this the
+ * cursor those routines put up could not be moved with the pad. Menus, the
+ * elevator panel and the pause prompt get it for the same reason and for free.
+ */
+unsigned char plat_getin(void)
+{
+    unsigned char code = plat_getin_keys();
+    return code ? code : plat_pad_key();
 }

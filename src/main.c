@@ -267,9 +267,13 @@ static void walk_pad(unsigned char facing, void (*request)(void))
  * than an action: held with left it opens the map, with L it cycles the item
  * and with R the weapon.
  */
-static void gamepad_pass(void)
+static unsigned char gamepad_pass(void)
 {
+    unsigned char acted;
+
     plat_gamepad_read();
+    if (!plat_pad_present())
+        return 0;
 
     if (!KEYTIMER) {
         /* SC02: forget the directions on both sides and look again, so a
@@ -283,32 +287,33 @@ static void gamepad_pass(void)
             if (pad_held(PAD_SELECT)) {
                 NEW_BUTTONS[PAD_LEFT] = 0;
                 plat_display_map();
-                return;
+                return 1;
             }
             walk_pad(FACE_LEFT, REQUEST_WALK_LEFT);
-            return;
+            return 1;
         }
         if (NEW_BUTTONS[PAD_RIGHT]) {
             walk_pad(FACE_RIGHT, REQUEST_WALK_RIGHT);
-            return;
+            return 1;
         }
         if (NEW_BUTTONS[PAD_UP]) {
             walk_pad(FACE_UP, REQUEST_WALK_UP);
-            return;
+            return 1;
         }
         if (NEW_BUTTONS[PAD_DOWN]) {
             walk_pad(FACE_DOWN, REQUEST_WALK_DOWN);
-            return;
+            return 1;
         }
         KEY_FAST = 0;                   /* SC35: nothing held, slow repeat again */
     }
 
     /* SC40: the buttons, which do not wait for the timer. The four face
      * buttons fire in the direction they sit in. */
-    if (NEW_BUTTONS[PAD_Y]) { FIRE_LEFT();  NEW_BUTTONS[PAD_Y] = 0; }
-    if (NEW_BUTTONS[PAD_A]) { FIRE_RIGHT(); NEW_BUTTONS[PAD_A] = 0; }
-    if (NEW_BUTTONS[PAD_X]) { FIRE_UP();    NEW_BUTTONS[PAD_X] = 0; }
-    if (NEW_BUTTONS[PAD_B]) { FIRE_DOWN();  NEW_BUTTONS[PAD_B] = 0; }
+    acted = 0;
+    if (NEW_BUTTONS[PAD_Y]) { FIRE_LEFT();  NEW_BUTTONS[PAD_Y] = 0; acted = 1; }
+    if (NEW_BUTTONS[PAD_A]) { FIRE_RIGHT(); NEW_BUTTONS[PAD_A] = 0; acted = 1; }
+    if (NEW_BUTTONS[PAD_X]) { FIRE_UP();    NEW_BUTTONS[PAD_X] = 0; acted = 1; }
+    if (NEW_BUTTONS[PAD_B]) { FIRE_DOWN();  NEW_BUTTONS[PAD_B] = 0; acted = 1; }
 
     if (NEW_BUTTONS[PAD_L]) {
         if (pad_held(PAD_SELECT))
@@ -317,6 +322,7 @@ static void gamepad_pass(void)
             SEARCH_OBJECT();
         NEW_BUTTONS[PAD_L] = 0;
         KEYTIMER = 15;
+        acted = 1;
     }
     if (NEW_BUTTONS[PAD_R]) {
         if (pad_held(PAD_SELECT))
@@ -325,12 +331,15 @@ static void gamepad_pass(void)
             MOVE_OBJECT();
         NEW_BUTTONS[PAD_R] = 0;
         KEYTIMER = 15;
+        acted = 1;
     }
     if (NEW_BUTTONS[PAD_START]) {
         USE_ITEM();
         NEW_BUTTONS[PAD_START] = 0;
         KEYTIMER = 15;
+        acted = 1;
     }
+    return acted;
 }
 
 /* CYCLE_WEAPON and CYCLE_ITEM: step to the next one and let the display
@@ -412,7 +421,7 @@ static void intro_screen(void)
         }
         SPRITECOLTIMER--;
 
-        key = plat_getin();
+        key = plat_getin();             /* which answers the pad as well */
         if (!key)
             continue;
 
@@ -444,10 +453,9 @@ static void intro_screen(void)
                     DIFF_LEVEL = 0;
                 plat_change_difficulty_level();
                 break;
-            case 3:                     /* CYCLE_CONTROLS */
+            case 3:                     /* CYCLE_CONTROLS, two schemes now */
                 KEYS_DEFINED = 0;       /* a new scheme is a new set of keys */
-                if (++CONTROL == 3)
-                    CONTROL = 0;
+                CONTROL ^= 1;
                 plat_display_control();
                 break;
             }
@@ -570,19 +578,17 @@ int main(void)
             continue;
         }
 
-        /* MG00: the pad instead of the keyboard, if that is what was chosen.
-         * SC75 still reads the keyboard, but only to notice run/stop. */
-        if (CONTROL == CONTROL_GAMEPAD) {
-            gamepad_pass();
-            if (plat_getin() == 3)
-                pause_game();
+        /* MG00 in the original picks the pad OR the keyboard, which leaves the
+         * pad unable to select itself: the menu that chooses it reads keys.
+         * Both run here, every pass, and the pad having acted is all that stops
+         * a key being read in the same one. */
+        if (gamepad_pass())
             continue;
-        }
 
         /* KY01: KEY_REPEAT then GETIN. The menus call GETIN alone, which is
          * why they act on presses and only walking repeats. */
         plat_key_repeat();
-        key = plat_getin();
+        key = plat_getin_keys();
         if (!key)
             continue;
 

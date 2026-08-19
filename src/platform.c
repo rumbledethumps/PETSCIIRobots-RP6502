@@ -327,13 +327,46 @@ void plat_display_map_name(void)
 /* The intro robot's expression, three 16x10 images at 2bpp, one per difficulty.
  * It goes into the bitmap plane at 234,95 -- so 160 bytes a row, and 234/2 = 117
  * bytes in. */
-/* CCON2: the chosen scheme, written over the intro screen's control line --
- * row 5 from column 4, ten characters. Without it the option looked broken:
- * pressing it cycled CONTROL and changed nothing you could see, so there was no
- * way to tell you had selected the gamepad. */
+/* CCON2: the chosen scheme, written over the intro screen's control line -- row
+ * 5 from column 4, ten characters. Without it the option looked broken: it
+ * cycled CONTROL and changed nothing you could see.
+ *
+ * DELIBERATE CHANGE. The original offers three schemes -- keyboard, custom key,
+ * snes pad -- and the pad is one of them, which means the pad cannot be chosen
+ * with the pad. The menu it has to be chosen from reads the keyboard only. Here
+ * the pad is always live and merged with whichever keyboard scheme is chosen,
+ * so the choice is only which keys: the defaults, or thirteen of your own.
+ * CONTROLTEXT is therefore ours rather than converted, and lives here. */
+static const unsigned char CONTROL_TEXT[2][10] = {
+    {  4,  5,  6,  1, 21, 12, 20, 32, 32, 32 },     /* "default   " */
+    {  3, 21, 19, 20, 15, 13, 32, 32, 32, 32 },     /* "custom    " */
+};
+
 void plat_display_control(void)
 {
-    put_glyphs(4, 5, CONTROLTEXT + CONTROLSTART[CONTROL], 10);
+    put_glyphs(4, 5, CONTROL_TEXT[CONTROL & 1], 10);
+}
+
+/* A gamepad press as the key code a menu would have got from the keyboard, so
+ * every screen that waits on GETIN answers to the pad without knowing about it:
+ * the intro menu, the elevator panel, the pause prompt. Directions come back as
+ * the cursor codes the game already accepts alongside the configurable ones,
+ * and either the bottom face button or START reads as a press of space.
+ *
+ * Returns one code per call and consumes the latch, the same contract GETIN
+ * has. Not used in play -- gamepad_pass does that, because there the buttons
+ * mean more than a menu can express. */
+unsigned char plat_pad_key(void)
+{
+    plat_gamepad_read();
+
+    if (NEW_BUTTONS[PAD_UP])    { NEW_BUTTONS[PAD_UP] = 0;    return 0x91; }
+    if (NEW_BUTTONS[PAD_DOWN])  { NEW_BUTTONS[PAD_DOWN] = 0;  return 0x11; }
+    if (NEW_BUTTONS[PAD_LEFT])  { NEW_BUTTONS[PAD_LEFT] = 0;  return 0x9D; }
+    if (NEW_BUTTONS[PAD_RIGHT]) { NEW_BUTTONS[PAD_RIGHT] = 0; return 0x1D; }
+    if (NEW_BUTTONS[PAD_START]) { NEW_BUTTONS[PAD_START] = 0; return 32; }
+    if (NEW_BUTTONS[PAD_B])     { NEW_BUTTONS[PAD_B] = 0;     return 32; }
+    return 0;
 }
 
 /* SET_CUSTOM_KEYS, from x16Robots.ASM 4767. Thirteen keys in the order
@@ -937,7 +970,7 @@ void plat_elevator_select(void)
      * which let robots move and shoot while the panel was up. The keyboard is
      * scanned by the interrupt now, so waiting here costs nothing. */
     for (;;) {
-        key = plat_getin();
+        key = plat_getin();             /* SELS5: which answers the pad too */
         if (!key)
             continue;
 
@@ -998,7 +1031,7 @@ void plat_elevator_select(void)
 #define PAD_TYPE_MASK 0x30      /* DPAD bits 4-5                    */
 #define PAD_TYPE_BA   0x20      /* 2 = Eastern BA, A and B swapped  */
 
-static unsigned char pad_now[12], pad_last[12];
+static unsigned char pad_now[12], pad_last[12], pad_present;
 
 void plat_gamepad_read(void)
 {
@@ -1014,7 +1047,8 @@ void plat_gamepad_read(void)
     btn0 = RIA.rw0;
     btn1 = RIA.rw0;
 
-    if (!(dpad & PAD_CONNECTED)) {
+    pad_present = (dpad & PAD_CONNECTED) != 0;
+    if (!pad_present) {
         for (i = 0; i < 12; i++)
             pad_now[i] = 0;
         return;                         /* no pad: nothing held, nothing new */
@@ -1058,6 +1092,15 @@ void plat_gamepad_read(void)
 /* SNES_SELECT and friends: whether a button is down now, as opposed to whether
  * it has just been pressed. SELECT is used as a shift key rather than an
  * action, so the code that reads it wants the hold, not the edge. */
+/* Whether a pad is plugged into player one, as of the last read. The main loop
+ * asks before running the pad's pass at all: that pass ends by clearing
+ * KEY_FAST when no direction is held, which is the pad's own business and would
+ * otherwise reset the keyboard's repeat acceleration on every frame. */
+unsigned char plat_pad_present(void)
+{
+    return pad_present;
+}
+
 unsigned char __fastcall__ pad_held(unsigned char button)
 {
     return pad_now[button];

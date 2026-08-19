@@ -224,13 +224,3 @@ GAMEOVER3:	.byte $6d,$40,$40,$40,$40,$40,$40,$40,$40,$40,$7d
 WIN_MSG:	.byte 25,15,21,32,23,9,14,33
 LOS_MSG:	.byte 25,15,21,32,12,15,19,5,33
 
-; The three control schemes, from x16Robots.ASM 4224-4228. Ten screen codes
-; each, written over the intro screen's control line when the option is cycled.
-; CONTROLSTART is the original's index table; kept because CYCLE_CONTROLS reads
-; it rather than multiplying.
-CONTROLTEXT:
-	.byte 11,  5, 25,  2, 15,  1, 18,  4, 32, 32   ; "keyboard  "
-	.byte  3, 21, 19, 20, 15, 13, 32, 11,  5, 25   ; "custom key"
-	.byte 19, 14,  5, 19, 32, 16,  1,  4, 32, 32   ; "snes pad  "
-CONTROLSTART:
-	.byte 0, 10, 20

@@ -338,6 +338,38 @@ the map rather than drawn over it. Level-g starts with a robot already in view,
 so it reaches the path on the first frame -- and getting there drives the intro
 menu's map option, which nothing else did either.
 
+## The gamepad is always live, and the menu has two schemes
+
+A deliberate change, and the reason for it is a design fault in the original:
+the pad is one of three schemes chosen from a menu that reads the keyboard, so
+**the pad cannot select itself**. You need a keyboard to turn the gamepad on.
+
+Here the pad is always merged with whichever keyboard scheme is chosen, and the
+menu offers two: **default** keys, or **custom**, which asks for thirteen of
+your own when the game starts. `CONTROL` is 0 or 1 and nothing tests it for 2
+any more.
+
+The merge happens in `plat_getin`. That matters more than it looks: the
+converted assembly calls GETIN from `MOVE_OBJECT` and `USER_SELECT_OBJECT` and
+picks its own pad path on `CONTROL == 2`, which this port no longer sets -- so
+without the merge, the selection cursor those routines put up could not be moved
+with the pad, and searching with L1 would leave a cursor on screen that nothing
+could answer. Doing it at GETIN means every screen that waits on a key answers
+to the pad: the intro menu, the elevator panel, the pause prompt, and those two
+routines, none of which needed changing.
+
+In play the main loop runs the pad's own pass first, because there a button
+means more than a key code can carry -- SELECT is a shift key, the face buttons
+fire by position, the sticks are merged in -- and only reads the key queue if
+the pad did not act. It uses `plat_getin_keys` for that, the queue without the
+pad, since the pad has already had its turn.
+
+One trap worth recording: the pad's pass ends with `SC35`, which clears
+`KEY_FAST` when no direction is held. Running that every frame reset the
+*keyboard's* repeat acceleration, so held keys never reached the fast rate and
+two tests started failing. The pass now returns immediately when no pad is
+plugged in, which is also less work per frame.
+
 ## The controls menu, which did nothing
 
 Reported alongside the gamepad: "controls menu also does nothing". Correct, and
