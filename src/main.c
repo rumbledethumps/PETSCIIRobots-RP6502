@@ -139,7 +139,7 @@ void update_probe(void)
     RIA.rw0 = PROBE_MAGIC_0;
     RIA.rw0 = PROBE_MAGIC_1;
     RIA.rw0 = UNIT_TYPE[0] == 1 ? PROBE_STATE_PLAYING : PROBE_STATE_DEAD;
-    RIA.rw0 = 0;                    /* level a */
+    RIA.rw0 = SELECTED_MAP;         /* 0..13, which level is loaded */
     RIA.rw0 = UNIT_LOC_X[0];
     RIA.rw0 = UNIT_LOC_Y[0];
     RIA.rw0 = UNIT_HEALTH[0];

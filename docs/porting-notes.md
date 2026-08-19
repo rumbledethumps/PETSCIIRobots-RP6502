@@ -331,10 +331,12 @@ Both blitters are verified against the tileset rather than by eye.
 `tiles.bin` and comparing all 1,386 bytes of the character plane -- zero
 mismatches. `plot_transparent_tile` was checked by forcing a known overlay tile
 with four transparent cells over known terrain and confirming each of the nine
-cells resolves the right way. Worth knowing: no shipped test reaches the overlay
-path on its own, because nothing puts a mobile unit inside the window near
-level-a's start -- doors and found objects are written into the map, not drawn
-over it.
+cells resolves the right way. The overlay path is covered by `tests/emu/overlay.txt`, which is the only test
+that leaves level-a: nothing in level-a puts a mobile unit inside the window
+anywhere the player can walk to, since doors and found objects are written into
+the map rather than drawn over it. Level-g starts with a robot already in view,
+so it reaches the path on the first frame -- and getting there drives the intro
+menu's map option, which nothing else did either.
 
 ## The border and background flashes
 
