@@ -359,6 +359,27 @@ deterministic under a fixed seed, so a recorded route is a normal test until the
 game's timing changes -- and when it does, regenerating is one command rather
 than an afternoon. `tests/emu/flash.txt` is the first test built this way.
 
+### What it still cannot reach, and why
+
+**The win screens.** `TRANSPORTER_PAD` only makes itself active once every unit
+in slots 1 to 27 is dead; until then standing on it does nothing. Winning is
+therefore a full combat playthrough -- find weapons, find ammunition, clear
+twenty-odd robots -- not a route. Surveying all fourteen levels for a pad
+reachable without keys found exactly one, level-h's at 21,25, and driving to it
+confirms the pad ignores a player who has not cleared the level. So
+`plat_game_over`'s win path and the endgame statistics screen stay verified by
+hand only.
+
+**Game over.** The same in reverse: the player has to be killed, and the hazards
+a route can reach stop hurting him well before zero. Level-e's rollerbot takes
+twelve health down to one and then loses interest.
+
+**Locked doors.** `UNIT_C` on a door is 0, or 1, 2, 3 for the spade, heart and
+star keys, and `AI_DOOR` will not open a locked one without the key in `KEYS`.
+The driver treats locked doors as walls because it starts from a cold boot with
+no keys; teaching it to search for keys would make it a game player rather than
+a test fixture.
+
 ## The border and background flashes
 
 `BORDER` and `BGFLASH` are each one array whose index 0 is a countdown and whose
