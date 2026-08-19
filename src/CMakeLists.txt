@@ -2,6 +2,7 @@ add_executable(robots)
 target_sources(robots PRIVATE
     main.c
     platform.c
+    input.c
     # David Murray's game logic, converted from ACME to ca65. These are the
     # original instructions, not a transliteration, so they behave exactly as
     # the X16 build does.
@@ -9,6 +10,8 @@ target_sources(robots PRIVATE
     game/window.s             # what should be on screen, not how to draw it
     game/transporter.s        # unit type 23, kept apart as the X16 did
     game/messages.s
+    game/items.s              # using, searching, pushing, firing
+    game/irq.s                # the VSYNC interrupt: timers and the game clock
     game/globals.s
     game/capi.s               # cc65 name aliasing, the only file that knows C exists
     game/platform_bridge.s    # the AI's calls into the platform layer

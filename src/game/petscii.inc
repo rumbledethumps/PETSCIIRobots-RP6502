@@ -26,21 +26,45 @@ PETSCII_INC = 1
 ; ---- more game state ----------------------------------------------------
         .globalzp SOURCE, TEMP_A, TEMP_B, TEMP_C, TEMP_D
         .globalzp MAP_WINDOW_X, MAP_WINDOW_Y, REDRAW_WINDOW, SCREEN_SHAKE
+        .globalzp SSCOUNT
         .globalzp PRECALC_COUNT
         .global UNIT_TIMER_A, UNIT_TIMER_B, UNIT_TILE, EXP_BUFFER, MAP_PRECALC
         .global BGTIMER1, BGTIMER2, BIG_EXP_ACT, MAGNET_ACT, PLASMA_ACT
+        .global IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE, CYCLES, SECONDS, MINUTES, HOURS
         .global KEYS, INV_MAGNET, BORDER
 
 ; ---- messages -----------------------------------------------------------
+        .global INTRO_MESSAGE
         .global MSG_TERMINATED, MSG_TRANS1, MSG_ELEVATOR, MSG_LEVELS
+        .global MSG_BLOCKED, MSG_CANTMOVE, MSG_EMPUSED, MSG_MUCHBET
+        .global MSG_NOTFOUND, MSG_SEARCHING
+        .global MSG_FOUNDKEY, MSG_FOUNDGUN, MSG_FOUNDEMP, MSG_FOUNDBOMB
+        .global MSG_FOUNDPLAS, MSG_FOUNDMED, MSG_FOUNDMAG
+
+; ---- inventory and control state ----------------------------------------
+        .globalzp CURSOR_X, CURSOR_Y, CURSOR_ON
+        .global AMMO_PISTOL, AMMO_PLASMA, INV_BOMBS, INV_EMP, INV_MEDKIT
+        .global SELECTED_WEAPON, SELECTED_ITEM
+        .global PLAYER_DIRECTION, PLAYER_ANIMATE, CONTROL
+        .global KEY_MOVE_UP, KEY_MOVE_DOWN, KEY_MOVE_LEFT, KEY_MOVE_RIGHT
+        .global KEY_FIRE_UP, KEY_FIRE_DOWN, KEY_FIRE_LEFT, KEY_FIRE_RIGHT
+        .global KEY_CYCLE_WEAPONS, KEY_CYCLE_ITEMS, KEY_USE, KEY_SEARCH, KEY_MOVE
+        .global NEW_B, NEW_Y, NEW_SELECT, NEW_START, NEW_UP, NEW_DOWN
+        .global NEW_LEFT, NEW_RIGHT, NEW_A, NEW_X, NEW_BACK_L, NEW_BACK_R
+        .global BGFLASH, STANDARD_CONTROLS
 
 ; ---- routines -----------------------------------------------------------
         .global GET_TILE_FROM_MAP, PLOT_TILE_TO_MAP, CHECK_FOR_UNIT
         .global REQUEST_WALK_UP, REQUEST_WALK_DOWN
         .global REQUEST_WALK_LEFT, REQUEST_WALK_RIGHT
         .global GENERATE_RANDOM_NUMBER
-        .global BACKGROUND_TASKS, UNIT_AI, AILP
+        .global BACKGROUND_TASKS, BG_TASKS_IMPL, UNIT_AI, AILP
         .global CACULATE_AND_REDRAW, MAP_PRE_CALCULATE, CHECK_FOR_WINDOW_REDRAW
+        .global CHECK_FOR_HIDDEN_UNIT
+        .global USE_ITEM, SEARCH_OBJECT, MOVE_OBJECT
+        .global FIRE_UP, FIRE_DOWN, FIRE_LEFT, FIRE_RIGHT
+        .global REVERSE_TILE, DISPLAY_KEYS, DISPLAY_WEAPON
+        .global DISPLAY_PLAYER_SPRITE, SNES_CONTROLER_READ
         .global DEMATERIALIZE
         .global DRAW_MAP_WINDOW, PLAY_DIGI_SOUND, PRINT_INFO
         .global DISPLAY_ITEM, DISPLAY_PLAYER_HEALTH, ELEVATOR_SELECT

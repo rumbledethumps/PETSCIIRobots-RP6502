@@ -1,8 +1,8 @@
 /* PETSCII Robots for the RP6502.
  *
  * The presentation and I/O are new; the game logic under src/game/ is David
- * Murray's assembly converted to ca65, so movement and collision behave
- * exactly as they do on the X16 rather than approximately.
+ * Murray's assembly converted to ca65, so movement, collision, item use and
+ * every robot behave exactly as they do on the X16 rather than approximately.
  */
 #include <fcntl.h>
 #include <rp6502.h>
@@ -12,13 +12,11 @@
 #include <unistd.h>
 
 #include "game/game.h"
+#include "input.h"
 #include "platform.h"
 #include "probe.h"
 #include "xram.h"
 
-static unsigned char keyboard[32];
-static unsigned char player_direction = FACE_DOWN;
-static unsigned char player_animate;
 static unsigned char frame_counter;
 
 /* Frames since the game loop started, as opposed to frame_counter which wraps
@@ -26,30 +24,9 @@ static unsigned char frame_counter;
  *
  * Tests need a reference point that does not depend on how long booting took.
  * Loading the assets goes through the host filesystem, and that is not the same
- * number of frames on every machine -- which is exactly what made an earlier
- * version of tests/emu/ai.txt pass here and fail in CI. Announcing a frame
- * number gives the harness something to synchronise on that the AI's own clock
- * defines. */
+ * number of frames on every machine. Announcing a frame number gives the
+ * harness something to synchronise on that the game's own clock defines. */
 static unsigned frames_total;
-
-/* USB HID keycodes. The RIA publishes a bit array of these, not PS/2 codes. */
-#define KEY_A 0x04
-#define KEY_D 0x07
-#define KEY_I 0x0C
-#define KEY_J 0x0D
-#define KEY_K 0x0E
-#define KEY_L 0x0F
-#define KEY_S 0x16
-#define KEY_W 0x1A
-#define KEY_RIGHT 0x4F
-#define KEY_LEFT  0x50
-#define KEY_DOWN  0x51
-#define KEY_UP    0x52
-
-/* Bits 0-3 of byte 0 are special: bit 0 is "no key pressed", bits 1-3 are the
- * lock LEDs. Real keys start at HID code 4. */
-#define key(code) (keyboard[(code) >> 3] & (1 << ((code) & 7)))
-#define KEY_NONE_DOWN 0x01
 
 static void die(const char *what)
 {
@@ -72,25 +49,23 @@ static void slurp_fd(int fd, void *dst, unsigned len)
         die("short read");
 }
 
+static void slurp(const char *name, void *dst, unsigned len)
+{
+    int fd = open(name, O_RDONLY);
+    if (fd < 0)
+        die(name);
+    slurp_fd(fd, dst, len);
+    close(fd);
+}
+
 static void load_tileset(void)
 {
     int fd = open("ROM:tiles", O_RDONLY);
     if (fd < 0)
         die("ROM:tiles");
     slurp_fd(fd, tile_cells, 256 * 3 * 6);
-    slurp_fd(fd, DESTRUCT_PATH, sizeof DESTRUCT_PATH);
-    slurp_fd(fd, TILE_ATTRIB, sizeof TILE_ATTRIB);
-    close(fd);
-}
-
-/* The unit arrays and the map are contiguous and in file order, so a level is
- * one read straight into place. */
-static void load_level(const char *name)
-{
-    int fd = open(name, O_RDONLY);
-    if (fd < 0)
-        die(name);
-    slurp_fd(fd, UNIT_TYPE, LEVEL_BYTES);
+    slurp_fd(fd, DESTRUCT_PATH, 256);
+    slurp_fd(fd, TILE_ATTRIB, 256);
     close(fd);
 }
 
@@ -141,52 +116,31 @@ static void video_init(void)
     xreg_vga_mode(3, 0x02, XR_CFG_BITMAP, 0);
     xreg_vga_mode(1, 0x02, XR_CFG_CHARS, 1);
 
-    xreg_ria_keyboard(XR_KEYBOARD);
+    /* Tick the game once a frame. Writing the register sets the enable mask and
+     * clears anything already triggered; src/game/irq.s reads it to acknowledge,
+     * since reading returns the triggered bits and clears them. cc65's runtime
+     * owns the $FFFE vector and walks the interruptor chain. */
+    RIA.irq = 0x80;
 }
 
-/* Park every sprite off screen, then point the player at its first frame.
- * Mode 5 has no enable bit, so off screen is how a sprite is turned off. */
-static void sprites_init(void)
+/* The character plane starts fully transparent. The console rows carry a colour
+ * from the outset because PRINT_INFO writes glyphs only, exactly as the X16's
+ * GREEN_SCREEN left them. */
+static void clear_chars(void)
 {
-    unsigned char i;
-    RIA.addr0 = XR_SPRITES;
+    unsigned i;
+    RIA.addr0 = XR_CHARS;
     RIA.step0 = 1;
-    for (i = 0; i < SPR_COUNT; i++) {
-        RIA.rw0 = 0;  RIA.rw0 = 0;                       /* x */
-        RIA.rw0 = SPR_PARKED_Y; RIA.rw0 = 0;             /* y */
-        RIA.rw0 = 0;  RIA.rw0 = 0;                       /* bitmap */
-        RIA.rw0 = 0;  RIA.rw0 = 0;                       /* palette */
+    for (i = 0; i < SCR_COLS * SCR_ROWS; i++) {
+        RIA.rw0 = 32;                                   /* PETSCII space */
+        RIA.rw0 = (i >= SCR_COLS * 27) ? 5 : 0;         /* green console */
     }
-    /* options 0x12 = 4bpp (2) | 32x32 (2 << 3); six sprites on plane 2. */
-    xreg_vga_mode(5, 0x12, XR_SPRITES, SPR_COUNT, 2);
 }
 
-/* The player's frame is direction + animate, exactly as the X16 indexes
- * PLAYER_SPRITE_TABLE. He never moves on screen; the window moves under him. */
-static void display_player_sprite(void)
-{
-    unsigned bitmap = XR_SPR_PLAYER
-                    + (unsigned)(player_direction + player_animate) * SPR_FRAME_BYTES;
-    RIA.addr0 = XR_SPRITES + SPR_PLAYER * 8;
-    RIA.step0 = 1;
-    RIA.rw0 = PLAYER_SPR_X & 0xFF;  RIA.rw0 = PLAYER_SPR_X >> 8;
-    RIA.rw0 = PLAYER_SPR_Y & 0xFF;  RIA.rw0 = PLAYER_SPR_Y >> 8;
-    RIA.rw0 = bitmap & 0xFF;        RIA.rw0 = bitmap >> 8;
-    /* Its own palette, which is how the transporter effect can cycle the
-     * player's colour 4 without touching the character plane. */
-    RIA.rw0 = XR_PAL_PLAYER & 0xFF; RIA.rw0 = XR_PAL_PLAYER >> 8;
-}
-
-static void update_probe(void)
+void update_probe(void)
 {
     unsigned char i, robots = 0, visible = 0;
     unsigned sum = 0;
-    /* How many units the last redraw actually drew over the terrain. Zero is
-     * the normal state: level-a starts the player 25 tiles from the nearest
-     * robot, so this only becomes non-zero once he walks to one. */
-    for (i = 0; i < 77; i++)
-        if (MAP_PRECALC[i])
-            visible++;
     for (i = 1; i < 28; i++) {
         if (UNIT_TYPE[i])
             robots++;
@@ -195,11 +149,15 @@ static void update_probe(void)
              + (unsigned)UNIT_LOC_X[i] * 31u
              + (unsigned)UNIT_LOC_Y[i] * 131u;
     }
+    for (i = 0; i < 77; i++)
+        if (MAP_PRECALC[i])
+            visible++;
+
     RIA.addr0 = XR_PROBE;
     RIA.step0 = 1;
     RIA.rw0 = PROBE_MAGIC_0;
     RIA.rw0 = PROBE_MAGIC_1;
-    RIA.rw0 = PROBE_STATE_PLAYING;
+    RIA.rw0 = UNIT_TYPE[0] == 1 ? PROBE_STATE_PLAYING : PROBE_STATE_DEAD;
     RIA.rw0 = 0;                    /* level a */
     RIA.rw0 = UNIT_LOC_X[0];
     RIA.rw0 = UNIT_LOC_Y[0];
@@ -212,143 +170,138 @@ static void update_probe(void)
     RIA.rw0 = sum & 0xFF;
     RIA.rw0 = sum >> 8;
     RIA.rw0 = visible;
+    RIA.rw0 = (unsigned char)(SELECTED_WEAPON | (SELECTED_ITEM << 4));
 }
 
-static void clear_chars(void)
+/* Animate the player one step and redraw him, as ANIMATE_PLAYER does. */
+static void animate_player(void)
 {
-    unsigned i;
-    RIA.addr0 = XR_CHARS;
-    RIA.step0 = 1;
-    for (i = 0; i < SCR_COLS * SCR_ROWS; i++) {
-        RIA.rw0 = 32;      /* PETSCII space */
-        RIA.rw0 = 0;       /* background 0, foreground 0: fully transparent */
-    }
+    if (++PLAYER_ANIMATE == 3)
+        PLAYER_ANIMATE = 0;
+    plat_display_player_sprite();
 }
 
-static void put_string(unsigned char col, unsigned char row,
-                       const char *s, unsigned char color)
+static void walk(unsigned char facing, void (*request)(void))
 {
-    RIA.addr0 = CELL(col, row);
-    RIA.step0 = 1;
-    while (*s) {
-        /* PETSCII screen codes: 'a'-'z' land at 1-26, matching the charset. */
-        char ch = *s++;
-        RIA.rw0 = (ch >= 'a' && ch <= 'z') ? (unsigned char)(ch - 0x60)
-                                           : (unsigned char)ch;
-        RIA.rw0 = color;
-    }
-}
-
-static void read_keyboard(void)
-{
-    unsigned char i;
-    RIA.addr0 = XR_KEYBOARD;
-    RIA.step0 = 1;
-    for (i = 0; i < sizeof keyboard; i++)
-        keyboard[i] = RIA.rw0;
-}
-
-/* Ask the game logic to move the player one square. UNIT and MOVE_TYPE are how
- * these routines take their arguments, exactly as on the X16. */
-static bool try_walk(void (*walk)(void))
-{
+    PLAYER_DIRECTION = facing;
     UNIT = 0;
     MOVE_TYPE = MOVE_WALK;
-    walk();
-    return MOVE_RESULT == 1;
+    request();
+    if (MOVE_RESULT == 1) {
+        animate_player();
+        CACULATE_AND_REDRAW();
+    } else {
+        /* Facing changes even when the way is blocked, as it does on the X16. */
+        plat_display_player_sprite();
+    }
+}
+
+/* CYCLE_WEAPON and CYCLE_ITEM: step to the next one and let the display
+ * routine's preselect rules sort out an empty slot. */
+static void cycle_weapon(void)
+{
+    plat_play_sound(SFX_CYCLEWEAPON);
+    SELECTED_WEAPON = (unsigned char)(SELECTED_WEAPON == 1 ? 2 : 1);
+    plat_display_weapon();
+}
+
+static void cycle_item(void)
+{
+    plat_play_sound(SFX_CYCLEITEM);
+    SELECTED_ITEM = (unsigned char)(SELECTED_ITEM >= 4 ? 1 : SELECTED_ITEM + 1);
+    plat_display_item();
 }
 
 int main(void)
 {
-    unsigned char last_vsync, repeat = 0, i;
-    bool moved;
+    unsigned char i, key, last_frame;
 
     load_tileset();
-    load_level("ROM:level-a");
+    slurp("ROM:level-a", UNIT_TYPE, LEVEL_BYTES);
 
     video_init();
-    sprites_init();
+    plat_sprites_init();
+    input_init();
     load_bitmap("ROM:gamepic");
     clear_chars();
 
+    /* INIT_GAME: nothing in inventory, everything is found by searching. */
+    for (i = 0; i < 13; i++)
+        KEY_MOVE_UP[i] = STANDARD_CONTROLS[i];
+    CONTROL = 0;
     RANDOM = 1;
+    PLAYER_DIRECTION = FACE_DOWN;
+    PLAYER_ANIMATE = 0;
+    UNIT_TYPE[0] = 1;
+
     /* Stagger the unit timers so the AI does not run every robot on the same
-     * frame, exactly as SET_INITIAL_TIMERS does on the X16. */
+     * frame, exactly as SET_INITIAL_TIMERS does. */
     for (i = 1; i < 48; i++) {
         UNIT_TIMER_A[i] = i;
         UNIT_TIMER_B[i] = 0;
     }
+
     CACULATE_AND_REDRAW();
     plat_draw_map_window();
-    display_player_sprite();
+    plat_display_player_sprite();
+    plat_display_player_health();
+    plat_display_keys();
+    plat_display_weapon();
+    plat_display_item();
 
-    put_string(0, 27, "petscii robots rp6502", 5);
-    put_string(0, 28, "ijkl or arrows to walk", 1);
-
-    /* Publish state before announcing readiness, not after. A test that waits
-     * for the console line then peeks the probe would otherwise be racing the
-     * first pass through the loop -- which is exactly the flake CI found and a
-     * local run did not. */
+    /* PRINT_INTRO_MESSAGE: the welcome line, on the console at start. */
+    SOURCE = INTRO_MESSAGE;
+    plat_print_info();
     update_probe();
+    last_frame = IRQ_FRAME;
     printf("BRINGUP OK level-a player %u,%u\n", UNIT_LOC_X[0], UNIT_LOC_Y[0]);
 
-    last_vsync = RIA.vsync;
+    CLOCK_ACTIVE = 1;
     for (;;) {
-        /* vsync is a counter, not a flag: taking the delta means a frame that
-         * overruns catches up instead of losing a tick, which the X16's
-         * IRQ-driven clock could not do. */
-        unsigned char v = RIA.vsync;
-        if (v == last_vsync)
-            continue;
-        last_vsync = v;
+        /* Once a frame, off the interrupt's counter. Everything that needs a
+         * portal lives out here rather than in the handler. */
+        while (last_frame == IRQ_FRAME)
+            ;
+        last_frame = IRQ_FRAME;
         frame_counter++;
         if (++frames_total == 60 || frames_total == 300)
             printf("AI%u\n", frames_total);
-
-        /* The X16 raised this from its VBLANK interrupt. Here the main loop is
-         * the frame, so it raises it before letting the AI run, and
-         * BACKGROUND_TASKS lowers it again. */
-        BGTIMER1 = 1;
-        BACKGROUND_TASKS();
         update_probe();
 
-        read_keyboard();
-        if (keyboard[0] & KEY_NONE_DOWN) {
-            repeat = 0;                 /* nothing held: the next press is instant */
-            continue;
-        }
-        if (repeat) {
-            repeat--;
-            continue;
-        }
+        BACKGROUND_TASKS();
 
-        moved = false;
-        if (key(KEY_L) || key(KEY_RIGHT)) {
-            player_direction = FACE_RIGHT;
-            moved = try_walk(REQUEST_WALK_RIGHT);
-        } else if (key(KEY_J) || key(KEY_LEFT)) {
-            player_direction = FACE_LEFT;
-            moved = try_walk(REQUEST_WALK_LEFT);
-        } else if (key(KEY_K) || key(KEY_DOWN)) {
-            player_direction = FACE_DOWN;
-            moved = try_walk(REQUEST_WALK_DOWN);
-        } else if (key(KEY_I) || key(KEY_UP)) {
-            player_direction = FACE_UP;
-            moved = try_walk(REQUEST_WALK_UP);
-        } else {
-            continue;
-        }
+        if (UNIT_TYPE[0] != 1)
+            continue;                   /* dead; M6 brings the game over screen */
 
-        repeat = 7;                     /* the X16's KEYTIMER repeat rate */
-        if (moved) {
-            if (++player_animate == 3)
-                player_animate = 0;
-            /* Ask for a redraw rather than doing one: BACKGROUND_TASKS draws
-             * at most once a frame, so a move and a robot moving in the same
-             * frame cost one redraw between them, not two. */
-            CACULATE_AND_REDRAW();
-        }
-        /* Facing changes even when the way is blocked, as it does on the X16. */
-        display_player_sprite();
+        key = plat_getin();
+        if (!key)
+            continue;
+
+        if (key == 0x1D || key == KEY_MOVE_UP[3])
+            walk(FACE_RIGHT, REQUEST_WALK_RIGHT);
+        else if (key == 0x9D || key == KEY_MOVE_UP[2])
+            walk(FACE_LEFT, REQUEST_WALK_LEFT);
+        else if (key == 0x11 || key == KEY_MOVE_UP[1])
+            walk(FACE_DOWN, REQUEST_WALK_DOWN);
+        else if (key == 0x91 || key == KEY_MOVE_UP[0])
+            walk(FACE_UP, REQUEST_WALK_UP);
+        else if (key == KEY_MOVE_UP[4])
+            FIRE_UP();
+        else if (key == KEY_MOVE_UP[5])
+            FIRE_DOWN();
+        else if (key == KEY_MOVE_UP[6])
+            FIRE_LEFT();
+        else if (key == KEY_MOVE_UP[7])
+            FIRE_RIGHT();
+        else if (key == KEY_MOVE_UP[8])
+            cycle_weapon();
+        else if (key == KEY_MOVE_UP[9])
+            cycle_item();
+        else if (key == KEY_MOVE_UP[10])
+            USE_ITEM();
+        else if (key == KEY_MOVE_UP[11])
+            SEARCH_OBJECT();
+        else if (key == KEY_MOVE_UP[12])
+            MOVE_OBJECT();
     }
 }

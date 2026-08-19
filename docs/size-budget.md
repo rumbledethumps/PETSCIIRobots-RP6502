@@ -179,3 +179,13 @@ The AI is 2,022 instructions of the original 6,133, and it cost 5.3 KB against
 the roughly 4.8 KB those instructions occupy in the X16 build — so the ported
 assembly is carrying its own weight, and the overhead is the C platform layer
 around it.
+
+## M5 — items, searching, the console and the HUD
+
+| segment | bytes | change |
+|---|---|---|
+| `CODE` | 15,871 | +4,843 |
+| `RODATA` + `DATA` | 1,297 | |
+| `BSS` | 5,549 | |
+| `LEVELDATA` | 8,704 | |
+| **RAM used, `$0200–$7DFF`** | **31,743** of 64,768 — **32.2 KB free** |

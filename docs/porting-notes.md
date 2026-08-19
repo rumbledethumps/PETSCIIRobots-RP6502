@@ -136,3 +136,50 @@ yet. Listed so nobody mistakes a silent one for a working one:
 | `plat_print_info` | M5, the three-line message console |
 | `plat_display_item`, `plat_display_player_health` | M5, the HUD |
 | `plat_elevator_select` | M6, the elevator UI |
+
+## Items, searching, pushing and firing
+
+`src/game/items.s` is `x16Robots.ASM` lines 1468-1986 and 2032-2544: `USE_ITEM`
+and the four things it dispatches to, all eight weapons-fire spawns,
+`SEARCH_OBJECT`, `MOVE_OBJECT` and `USER_SELECT_OBJECT`. This is the half of the
+machine-specific file that is not actually machine-specific -- using an item,
+spawning a shot, searching a crate and pushing an object are decisions about
+game state.
+
+Two things reached past that and had to change:
+
+- **The search progress dots.** The original pokes a period straight into video
+  memory at row 29, column 9 + `SEARCHBAR`. That is now `plat_search_dot` with
+  the index in A.
+- **`JSR $FFE4`**, KERNAL GETIN. On the RP6502 that address is the RIA's `RW0`
+  portal, so the call would pull a byte out of XRAM and advance the portal
+  address. `plat_getin` returns what GETIN returned -- the next key code, or
+  zero -- and `src/input.c` keeps producing the codes `STANDARD_CONTROLS` names,
+  so every comparison in the ported assembly is unchanged.
+
+The `STA $E3C9,X` inside `SEARCH_OBJECT` is deleted. It is a PET-era leftover
+with an unconstrained X; on the X16 the target is ROM so the write evaporates,
+and here it is RAM.
+
+## The tick, and what belongs where
+
+The game runs on a sixty-times-a-second tick: timers count down, the game clock
+advances, and `BACKGROUND_TASKS` gets its cue to run one pass of unit AI. That
+is a display-rate heartbeat, so it lives on the RIA's VSYNC interrupt, which is
+where the X16 has it too.
+
+It has to be an interrupt rather than something the main loop does. The game
+waits by spinning: `SEARCH_OBJECT` sits on `BGTIMER2` calling
+`BACKGROUND_TASKS` until it reaches zero, and nothing inside that loop would
+ever decrement it.
+
+`src/game/irq.s` also carries the video register updates, because the start of
+vblank is when a plane's scroll position or a palette entry can change without
+tearing. The main loop decides what the registers should say and leaves it in
+RAM; the handler pushes it out. That means touching XRAM from an interrupt, and
+the two portals are global state with no save area, so the handler saves and
+restores portal 1 around its writes -- six bytes at sixty hertz, and the main
+loop never has to know.
+
+The VIA is left alone. It is a free-running timer, which suits genuinely
+asynchronous work; the game tick is not that.

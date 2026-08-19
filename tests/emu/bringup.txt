@@ -60,5 +60,5 @@ peek xram:$FE0A $11 $23
 wait "AI60"
 
 # One golden frame. Regenerate with: python3 tools/emu-crc.py tests/emu/bringup.txt
-expect-crc E0A5D57D
+expect-crc 88D7C857
 shot "bringup.png"

@@ -18,6 +18,9 @@
 ; Everything the file calls that is not in here is declared in petscii.inc:
 ; game state in globals.s, and the presentation entry points in
 ; platform_bridge.s, which forwards them to C.
+;
+; The per-frame timers this consumes are maintained by the VSYNC interrupt in
+; irq.s, exactly as they were by the X16's VBLANK handler.
 
         .include "petscii.inc"
         .include "sounds.inc"

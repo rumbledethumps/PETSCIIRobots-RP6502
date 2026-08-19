@@ -32,8 +32,12 @@ TEMP_D:         .res 1
 MAP_WINDOW_X:   .res 1          ; top-left of the visible map window
 MAP_WINDOW_Y:   .res 1
 REDRAW_WINDOW:  .res 1          ; 1 = the window needs redrawing
-SCREEN_SHAKE:   .res 1          ; 1 = shake the character plane this frame
+SCREEN_SHAKE:   .res 1          ; 1 = shake the character plane
+SSCOUNT:        .res 1          ; shake phase, 0..4
 PRECALC_COUNT:  .res 1          ; index into MAP_PRECALC while drawing
+CURSOR_X:       .res 1          ; selection cursor, in map window cells
+CURSOR_Y:       .res 1
+CURSOR_ON:      .res 1          ; 0 off, 1 compass, 2 magnifier, 3 hand
 
 ; ---- level data ---------------------------------------------------------
         .segment "LEVELDATA"
@@ -73,13 +77,71 @@ EXP_BUFFER:     .res 16         ; tiles an explosion covered, to restore after
 MAP_PRECALC:    .res 77
 
 ; ---- game flags ---------------------------------------------------------
-BGTIMER1:       .res 1          ; set once a frame, cleared by the main loop
+; Maintained by the VSYNC interrupt in irq.s, exactly as the X16's VBLANK
+; handler maintained them.
+IRQ_FRAME:      .res 1          ; ticks elapsed, wraps at 256
+KEYTIMER:       .res 1          ; counts down; gates the key repeat
+CLOCK_ACTIVE:   .res 1          ; 1 once the level starts
+CYCLES:         .res 1          ; the game clock, 60 cycles to the second
+SECONDS:        .res 1
+MINUTES:        .res 1
+HOURS:          .res 1
+
+BGTIMER1:       .res 1          ; set once a frame, cleared by BACKGROUND_TASKS
 BGTIMER2:       .res 1          ; counts down to zero and stays there
 BIG_EXP_ACT:    .res 1          ; only one big explosion may run at a time
 MAGNET_ACT:     .res 1
 PLASMA_ACT:     .res 1
 KEYS:           .res 1          ; bit 0 spade, bit 1 heart, bit 2 star
-INV_MAGNET:     .res 1          ; magnets carried
+
+; ---- inventory ----------------------------------------------------------
+AMMO_PISTOL:    .res 1
+AMMO_PLASMA:    .res 1
+INV_BOMBS:      .res 1
+INV_EMP:        .res 1
+INV_MEDKIT:     .res 1
+INV_MAGNET:     .res 1
+SELECTED_WEAPON: .res 1         ; 0 none, 1 pistol, 2 plasma
+SELECTED_ITEM:  .res 1          ; 0 none, 1 bomb, 2 EMP, 3 medkit, 4 magnet
+
+; ---- player presentation state ------------------------------------------
+PLAYER_DIRECTION: .res 1        ; 0 up, 3 down, 6 left, 9 right, 12 dead
+PLAYER_ANIMATE:   .res 1        ; 0..2, added to PLAYER_DIRECTION for the frame
+
+; ---- control scheme -----------------------------------------------------
+; 0 keyboard, 1 custom keys, 2 gamepad. The X16 called the third one SNES.
+CONTROL:        .res 1
+
+; The thirteen bindings, in the order STANDARD_CONTROLS lists them. Declared as
+; one array because SET_CUSTOM_KEYS fills it with STA KEY_MOVE_UP,Y.
+KEY_MOVE_UP:      .res 1
+KEY_MOVE_DOWN:    .res 1
+KEY_MOVE_LEFT:    .res 1
+KEY_MOVE_RIGHT:   .res 1
+KEY_FIRE_UP:      .res 1
+KEY_FIRE_DOWN:    .res 1
+KEY_FIRE_LEFT:    .res 1
+KEY_FIRE_RIGHT:   .res 1
+KEY_CYCLE_WEAPONS: .res 1
+KEY_CYCLE_ITEMS:  .res 1
+KEY_USE:          .res 1
+KEY_SEARCH:       .res 1
+KEY_MOVE:         .res 1
+
+; New gamepad presses, latched until the game consumes them. Same order the X16
+; unpacked them in.
+NEW_B:      .res 1
+NEW_Y:      .res 1
+NEW_SELECT: .res 1
+NEW_START:  .res 1
+NEW_UP:     .res 1
+NEW_DOWN:   .res 1
+NEW_LEFT:   .res 1
+NEW_RIGHT:  .res 1
+NEW_A:      .res 1
+NEW_X:      .res 1
+NEW_BACK_L: .res 1
+NEW_BACK_R: .res 1
 
         .segment "DATA"
 
@@ -87,3 +149,14 @@ INV_MAGNET:     .res 1          ; magnets carried
 ; IRQ walked on the X16. Kept as one array because the original decrements
 ; BORDER and then indexes BORDER,X with it.
 BORDER:         .byte 0, 0, 8, 15, 25, 31, 31, 25, 15, 8, 0
+
+; The background flash, same shape: index 0 counts down, the rest is the ramp.
+BGFLASH:        .byte 0, 0, 8, 15, 79, 159, 159, 79, 15, 8, 0
+
+; The thirteen defaults: I K J L to walk, W S A D to fire, F1 and F3 to cycle,
+; space to use, Z to search, M to push. Copied into KEY_MOVE_UP at level start.
+STANDARD_CONTROLS:
+        .byte 73, 75, 74, 76           ; move    up down left right
+        .byte 87, 83, 65, 68           ; fire    up down left right
+        .byte 133, 134                 ; cycle   weapons, items
+        .byte 32, 90, 77               ; use, search, push

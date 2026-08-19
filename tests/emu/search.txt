@@ -1,0 +1,42 @@
+# Searching, which is the deepest path through the ported code so far.
+#
+# Pressing Z runs SEARCH_OBJECT, which raises the magnifier cursor and calls
+# USER_SELECT_OBJECT; that reads a key through what used to be KERNAL GETIN and
+# returns as soon as a direction arrives, having moved the cursor one cell. The
+# search then checks the tile is searchable, spends eight ticks laying down
+# progress dots while BACKGROUND_TASKS keeps the AI running underneath, calls
+# CHECK_FOR_HIDDEN_UNIT over the object's search box, and prints the result.
+#
+# level-a hides a pistol at 20,36 with a search box that reaches the crates
+# beside it. So one square left of the start, searching upward, finds it.
+#
+# What this exercises that nothing else does: the input translation, the
+# cursor sprite, the timer the search spins on -- which only advances because
+# the VSYNC interrupt is running -- the message console, and the HUD.
+
+wait "AI60"
+
+# One square left, to x=21.
+press j
+run 6
+release j
+run 20
+peek xram:$FE04 $15 $26
+
+# Z, then up: search the cell above.
+press z
+run 6
+release z
+run 10
+press i
+run 6
+release i
+
+# Eight dots at eighteen ticks each, so give it three seconds.
+run 200
+
+# Probe byte 15 packs the selections: weapon in the low nibble, item in the
+# high one. 1 is the pistol, and finding it selects it.
+peek xram:$FE0F $01
+
+shot "search.png"

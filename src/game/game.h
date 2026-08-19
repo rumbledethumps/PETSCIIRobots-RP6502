@@ -32,6 +32,11 @@ extern unsigned char RANDOM;       /* LFSR state; seed it non-zero         */
 #pragma zpsym("UNIT_FIND")
 #pragma zpsym("RANDOM")
 
+/* The message pointer PRINT_INFO reads. Two zero page bytes, so it is a real
+ * pointer here rather than a pair of bytes. */
+extern unsigned char *SOURCE;
+#pragma zpsym("SOURCE")
+
 extern unsigned char MAP_WINDOW_X, MAP_WINDOW_Y;  /* top-left of the window   */
 extern unsigned char REDRAW_WINDOW;               /* 1 = redraw is due        */
 extern unsigned char SCREEN_SHAKE;                /* 1 = shake this frame     */
@@ -70,7 +75,65 @@ extern unsigned char MAP_PRECALC[77];   /* units inside the 11x7 window        *
 /* Set once a frame by the main loop; BACKGROUND_TASKS consumes it. On the X16
  * this was the IRQ's job. */
 extern unsigned char BGTIMER1, BGTIMER2;
+
+/* Maintained by the VSYNC interrupt in src/game/irq.s. IRQ_FRAME is the frame
+ * reference anything outside the interrupt uses to know time has passed. */
+extern unsigned char IRQ_FRAME, KEYTIMER, CLOCK_ACTIVE;
+extern unsigned char CYCLES, SECONDS, MINUTES, HOURS;
 extern unsigned char KEYS, INV_MAGNET;
+
+/* ---- inventory and selection ----------------------------------------- */
+extern unsigned char AMMO_PISTOL, AMMO_PLASMA;
+extern unsigned char INV_BOMBS, INV_EMP, INV_MEDKIT, INV_MAGNET;
+extern unsigned char SELECTED_WEAPON;   /* 0 none, 1 pistol, 2 plasma        */
+extern unsigned char SELECTED_ITEM;     /* 0 none, 1 bomb, 2 EMP, 3 medkit,
+                                           4 magnet                          */
+extern unsigned char PLAYER_DIRECTION;  /* 0 up, 3 down, 6 left, 9 right     */
+extern unsigned char PLAYER_ANIMATE;    /* 0..2, added for the sprite frame  */
+extern unsigned char CONTROL;           /* 0 keyboard, 1 custom, 2 gamepad   */
+
+extern unsigned char CURSOR_X, CURSOR_Y;  /* selection cursor, window cells  */
+extern unsigned char CURSOR_ON;           /* 0 off, 1 compass, 2 lens, 3 hand */
+#pragma zpsym("CURSOR_X")
+#pragma zpsym("CURSOR_Y")
+#pragma zpsym("CURSOR_ON")
+
+/* The thirteen bindings, in STANDARD_CONTROLS order. */
+extern unsigned char KEY_MOVE_UP[13];
+extern unsigned char STANDARD_CONTROLS[13];
+
+/* Sound effect numbers, from reference/x16/sounds.inc. The X16 played these as
+ * digitised samples; the RP6502 will play the original PET engine's patterns on
+ * the PSG. The numbers are unchanged either way. */
+#define SFX_BEEP2         0
+#define SFX_BEEP          1
+#define SFX_CYCLEITEM     2
+#define SFX_CYCLEWEAPON   3
+#define SFX_DOOR          4
+#define SFX_EMP           5
+#define SFX_ERROR         6
+#define SFX_EXPLOSION     7
+#define SFX_FOUNDITEM     8
+#define SFX_MAGNET2       9
+#define SFX_MAGNET       10
+#define SFX_MEDKIT       11
+#define SFX_MOVE         12
+#define SFX_PISTOL       13
+#define SFX_PLASMA       14
+#define SFX_SHOCK        15
+
+/* Screen-code strings: 0 ends one, 255 forces a new line. */
+extern unsigned char INTRO_MESSAGE[];
+extern unsigned char MSG_SEARCHING[];
+
+/* ---- the actions the player can take --------------------------------- */
+void USE_ITEM(void);
+void SEARCH_OBJECT(void);
+void MOVE_OBJECT(void);
+void FIRE_UP(void);
+void FIRE_DOWN(void);
+void FIRE_LEFT(void);
+void FIRE_RIGHT(void);
 
 /* ---- tileset --------------------------------------------------------- */
 extern unsigned char DESTRUCT_PATH[256];
