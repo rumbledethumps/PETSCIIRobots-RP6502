@@ -15,6 +15,7 @@
 #include "input.h"
 #include "platform.h"
 #include "probe.h"
+#include "psg.h"
 #include "xram.h"
 
 static unsigned char frame_counter;
@@ -100,11 +101,6 @@ static void video_init(void)
     xreg_vga_mode(3, 0x02, XR_CFG_BITMAP, 0);
     xreg_vga_mode(1, 0x02, XR_CFG_CHARS, 1);
 
-    /* Tick the game once a frame. Writing the register sets the enable mask and
-     * clears anything already triggered; src/game/irq.s reads it to acknowledge,
-     * since reading returns the triggered bits and clears them. cc65's runtime
-     * owns the $FFFE vector and walks the interruptor chain. */
-    RIA.irq = 0x80;
 }
 
 /* The character plane starts fully transparent. The console rows carry a colour
@@ -220,6 +216,7 @@ static void intro_screen(void)
 
     plat_display_intro_screen();
     plat_display_map_name();
+    START_MUSIC(INTRO_MUSIC);
     plat_change_difficulty_level();
     MENUY = 0;
     printf("MENU\n");
@@ -319,6 +316,10 @@ static void init_game(void)
     plat_display_weapon();
     plat_display_item();
 
+    /* One of the three in-game songs, picked by level as the X16 does. */
+    START_MUSIC(SELECTED_MAP % 3 == 0 ? IN_GAME_MUSIC1
+              : SELECTED_MAP % 3 == 1 ? IN_GAME_MUSIC2 : IN_GAME_MUSIC3);
+
     /* PRINT_INTRO_MESSAGE. */
     SOURCE = INTRO_MESSAGE;
     plat_print_info();
@@ -333,6 +334,19 @@ int main(void)
     video_init();
     plat_sprites_init();
     input_init();
+    /* Before the interrupt is enabled: after that, the engine ticks from it and
+     * the PSG registers belong to the interrupt. */
+    psg_init();
+    SOUND_EFFECT = 0xFF;                /* nothing playing */
+    TEMPO = 7;
+
+    /* Only now: the handler ticks the sound engine and writes the PSG, so
+     * everything it touches has to exist first. Writing the register sets the
+     * enable mask and clears anything already triggered; src/game/irq.s reads
+     * it to acknowledge, since reading returns the triggered bits and clears
+     * them. cc65's runtime owns the $FFFE vector and walks the interruptor
+     * chain. */
+    RIA.irq = 0x80;
     clear_chars();
 
     for (i = 0; i < 13; i++)

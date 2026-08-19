@@ -748,7 +748,7 @@ void plat_display_item(void)
 
 void __fastcall__ plat_play_sound(unsigned char effect)
 {
-    (void)effect;               /* M7: the PET music engine on the RIA PSG */
+    PLAY_SOUND(effect);
 }
 
 /* The elevator panel. The AI has already printed the two message lines; this

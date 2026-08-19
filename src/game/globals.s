@@ -112,6 +112,22 @@ SECONDS:        .res 1
 MINUTES:        .res 1
 HOURS:          .res 1
 
+; ---- the sound engine ---------------------------------------------------
+; The PET engine's state, from reference/pet/PETROBOTS12.ASM 242-246 and
+; 4619-4621. CUR_PATTERN is in zero page with the rest.
+MUSIC_ON:       .res 1          ; 1 = a song is playing
+SOUND_EFFECT:   .res 1          ; $FF = none; otherwise the effect number
+TEMPO_TIMER:    .res 1          ; ticks left before the next pattern row
+TEMPO:          .res 1          ; ticks between rows
+DATA_LINE:      .res 1          ; the row being played; wraps at 256, which is
+                                ; how the songs loop -- each is 256 bytes
+ARP_MODE:       .res 1          ; 0 none, 1 major, 2 minor, 3 sus4
+CHORD_ROOT:     .res 1          ; the note the arpeggio is built on
+PATTERN_L_TEMP: .res 1          ; the song, parked while an effect plays
+PATTERN_H_TEMP: .res 1
+DATA_LINE_TEMP: .res 1
+TEMPO_TEMP:     .res 1
+
 RANDOM:         .res 1          ; 8-bit LFSR state; seed it non-zero
 SSCOUNT:        .res 1          ; screen shake phase, 0..4
 BGTIMER1:       .res 1          ; set once a tick, cleared by BACKGROUND_TASKS

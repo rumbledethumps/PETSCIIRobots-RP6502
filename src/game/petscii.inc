@@ -16,6 +16,17 @@ PETSCII_INC = 1
         .globalzp UNIT_FIND, MAP_PTR, SOURCE, CUR_PATTERN
         .globalzp TEMP_X, TEMP_Y, DECNUM, ATTRIB
         .global RANDOM, SSCOUNT
+        .global MUSIC_ON, SOUND_EFFECT, TEMPO_TIMER, TEMPO, DATA_LINE
+        .global ARP_MODE, CHORD_ROOT
+        .global PATTERN_L_TEMP, PATTERN_H_TEMP, DATA_LINE_TEMP, TEMPO_TEMP
+        .global NOTE_FREQ_PSG
+        .global SND_EXPLOSION, SND_MEDKIT, SND_EMP, SND_MAGNET, SND_SHOCK
+        .global SND_MOVE_OBJ, SND_PLASMA, SND_PISTOL, SND_ITEM_FOUND
+        .global SND_ERROR, SND_CYCLE_WEAPON, SND_CYCLE_ITEM, SND_DOOR
+        .global SND_MENU_BEEP, SND_SHORT_BEEP
+        .global INTRO_MUSIC, WIN_MUSIC, LOSE_MUSIC
+        .global IN_GAME_MUSIC1, IN_GAME_MUSIC2, IN_GAME_MUSIC3
+        .global MUSIC_ROUTINE, PLAY_SOUND, STOP_SONG, START_MUSIC, STOP_MUSIC
 
 ; ---- level data ---------------------------------------------------------
         .global UNIT_TYPE, UNIT_LOC_X, UNIT_LOC_Y

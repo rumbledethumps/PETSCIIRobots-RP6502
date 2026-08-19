@@ -1,0 +1,26 @@
+# The PET sound engine, recovered from reference/pet/PETROBOTS12.ASM and pointed
+# at the RIA PSG.
+#
+# The X16 port deleted this when ZSOUND arrived -- MUSIC_ROUTINE and
+# SET_WAVEFORM are bare RTS stubs there -- so the patterns come from the PET
+# sources: 1,240 bytes of one-byte-per-row patterns, fifteen effects and six
+# songs. The engine ticks from the VSYNC interrupt, where the PET calls it.
+#
+# Oscillator 0 is at XRAM $FF00: frequency in the first two bytes as hertz times
+# three, then duty, the two envelope bytes, waveform and release, and the
+# pan/gate byte whose bit 0 is the gate.
+
+wait "MENU"
+run 20
+
+# The intro song is playing: a square wave, centre pan, gate on. Bytes 2 to 6
+# are the instrument and do not change from row to row.
+peek xram:$FF02 $80 $20 $20 $11 $01
+
+# The tune moves. These are exact because the emulator is deterministic and the
+# engine is driven by a fixed pattern from a known starting row.
+peek xram:$FF00 $7F $06
+run 30
+peek xram:$FF00 $56 $04
+run 30
+peek xram:$FF00 $DD $03

@@ -108,6 +108,11 @@ VBLANK_VIDEO:
         sta     RIA_RW1
         stx     RIA_RW1
 
+        ; One tick of the sound engine, where the PET calls it. Its only output
+        ; is through the platform layer's PSG writes, which use this portal, so
+        ; it belongs inside the save.
+        jsr     MUSIC_ROUTINE
+
         pla
         sta     RIA_STEP1
         pla

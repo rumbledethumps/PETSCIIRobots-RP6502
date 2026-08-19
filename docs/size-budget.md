@@ -199,3 +199,16 @@ around it.
 | `BSS` | 5,558 |
 | `LEVELDATA` | 8,704 |
 | **RAM used** | **≈34,300** of 64,768 — **≈30 KB free** |
+
+## M6 and M7 — live map, endings, elevator, sound
+
+| segment | bytes |
+|---|---|
+| `CODE` | 20,469 |
+| `RODATA` + `DATA` | 3,910 |
+| `BSS` | 5,563 |
+| `LEVELDATA` | 8,704 |
+| **RAM used** | **≈39,000** of 64,768 — **≈25 KB free** |
+
+The sound engine is about 400 bytes of code and 1,314 of data, against the
+1.44 MB of ZSM and ZCM the X16 build carries.

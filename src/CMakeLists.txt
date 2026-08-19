@@ -3,12 +3,15 @@ target_sources(robots PRIVATE
     main.c
     platform.c
     input.c
+    psg.c
     # David Murray's game logic, converted from ACME to ca65. These are the
     # original instructions, not a transliteration, so they behave exactly as
     # the X16 build does.
     game/background_tasks.s   # the AI dispatcher and all 24 unit types
     game/window.s             # what should be on screen, not how to draw it
     game/transporter.s        # unit type 23, kept apart as the X16 did
+    game/music.s              # the PET sound engine, recovered
+    game/music_data.s         # its patterns and the note table
     game/messages.s
     game/screens.s            # the four screen layouts and the intro artwork
     game/items.s              # using, searching, pushing, firing

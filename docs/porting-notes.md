@@ -266,3 +266,43 @@ but no level puts an elevator somewhere a script can reach cheaply. The nearest
 is level-k's, eight tiles from the start, and the route runs around a bunker and
 through a corridor where a robot stands in the way. Worth coming back to with a
 scripted path, or a test hook that places the player.
+
+## Sound: the engine the X16 threw away
+
+The RP6502 has a PSG, not a sample player, so the right engine is the original
+one -- and it is not in this repo. When the X16 port adopted ZSOUND it replaced
+`MUSIC_ROUTINE` and `SET_WAVEFORM` with bare `RTS` stubs and moved to recorded
+samples, leaving only the dead state variables behind. `reference/pet/` holds
+the PET sources, which still have all of it.
+
+`src/game/music.s` is `PETROBOTS12.ASM` 4583-4790: `PLAY_SOUND`,
+`MUSIC_ROUTINE`, `STOP_SONG`. `tools/convert/conv_music.py` extracts the
+patterns -- fifteen effects and six songs, 1,240 bytes -- and rebuilds the note
+table, because the PET's is VIA shift-register timer values rather than pitches.
+Note 1 is B3 and note 2 is C4, so note n is n-2 semitones from C4; the check
+that it came out right is note 11 landing on 1320, which is 440 Hz times the
+three the RIA wants.
+
+The pattern language: 0 rests, 1-36 play a note with an arpeggio mode in the top
+two bits, 37 ends, 38 is note off, 39-48 set the tempo. Songs are 256 bytes and
+`DATA_LINE` is a byte, so the wrap *is* the loop.
+
+Three things needed care:
+
+- **The engine ticks from the VSYNC interrupt**, where the PET calls it. Its
+  output goes through the PSG registers in XRAM, so it runs inside the portal
+  save the handler already does, and `psg_init` happens before the interrupt is
+  enabled -- otherwise the first tick would follow an uninitialised pattern
+  pointer.
+- **The gate is edge-triggered.** Writing 1 while the oscillator is already
+  sounding does nothing, so a new note clears the gate and sets it again. Without
+  that every pattern is one long slur.
+- **`PLAY_SOUND` and `START_MUSIC` update a two-byte pointer the interrupt
+  reads.** A tick landing between the halves follows a pointer that is half one
+  pattern and half another. The PET has the same shape and the same hazard; it
+  costs an `sei`/`cli` pair to not have it.
+
+A sound effect still interrupts the music and restores it afterwards, because
+both share one voice. That is the PET's constraint rather than this machine's --
+the RIA has eight oscillators -- but keeping it keeps the timing and the
+priority rules the original's.

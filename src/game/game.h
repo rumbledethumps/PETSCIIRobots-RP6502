@@ -142,6 +142,20 @@ extern unsigned char CINEMA_MESSAGE[], THREE_FACES[];
  * tile is two pixels of a 4bpp bitmap. */
 extern unsigned char MAP_TRANSLATION_TABLE[256];
 
+/* ---- the sound engine ------------------------------------------------ */
+extern unsigned char MUSIC_ON;          /* 1 = a song is playing            */
+extern unsigned char SOUND_EFFECT;      /* $FF = none                       */
+extern unsigned char TEMPO, ARP_MODE, CHORD_ROOT;
+extern unsigned char NOTE_FREQ_PSG[];   /* note -> hertz times three        */
+
+extern unsigned char INTRO_MUSIC[], WIN_MUSIC[], LOSE_MUSIC[];
+extern unsigned char IN_GAME_MUSIC1[], IN_GAME_MUSIC2[], IN_GAME_MUSIC3[];
+
+void MUSIC_ROUTINE(void);               /* one tick; call it from the IRQ   */
+void __fastcall__ PLAY_SOUND(unsigned char effect);
+void __fastcall__ START_MUSIC(unsigned char *pattern);
+void STOP_MUSIC(void);
+
 /* The game over box, eleven characters a row, and the two endings. */
 extern unsigned char GAMEOVER1[11], GAMEOVER2[11], GAMEOVER3[11];
 extern unsigned char WIN_MSG[8], LOS_MSG[9];
