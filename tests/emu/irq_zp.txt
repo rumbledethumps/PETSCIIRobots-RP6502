@@ -1,0 +1,112 @@
+# The interrupt calls C, so it goes through set_irq.
+#
+# MUSIC_ROUTINE ticks from the VSYNC interrupt and reaches the PSG driver, which
+# is C. cc65 compiles every C function against twenty bytes of shared zero-page
+# scratch -- the C stack pointer, sreg, regsave, ptr1-4, tmp1-4 -- so a handler
+# that calls C and does not put those back returns to a C function holding its
+# own pointers rewritten. As a bare .interruptor this handler did exactly that.
+#
+# PLOT_TILE is C, which is how it showed: a tile whose base address was
+# corrupted mid-loop wrote its three rows, six bytes each and eighty bytes
+# apart, into the bitmap plane instead of the character plane. The bitmap does
+# not scroll, so the runs stayed at a fixed screen position behind the moving
+# playfield for the rest of the game.
+#
+# Ten steps right was enough to hit it. This walks twenty and checks the three
+# addresses it landed on, which are black backdrop in gamepic.bin and must stay
+# that way. The fix is cc65's own: set_irq installs the handler and the
+# runtime's clevel_irq wrapper saves that zero page around the call.
+
+wait "MENU"
+run 30
+press space
+run 6
+release space
+wait "BRINGUP OK"
+run 60
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+press l
+run 8
+release l
+run 6
+
+# Bitmap row 117 at x 184, and rows 118 at x 24 and x 184 -- addr, addr+80 and
+# addr+160 of the one tile that used to be misplaced.
+peek xram:18812 $00 $00 $00 $00 $00 $00
+peek xram:18892 $00 $00 $00 $00 $00 $00
+peek xram:18972 $00 $00 $00 $00 $00 $00

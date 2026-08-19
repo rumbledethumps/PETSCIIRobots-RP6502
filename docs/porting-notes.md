@@ -319,6 +319,39 @@ Four things needed care:
   intro song with the bug and a steady 7 without it. An explicit `lda #0`
   restores the invariant the fallthrough assumes.
 
+### The interrupt calls C, so it goes through set_irq
+
+Symptom: after walking a while, small runs of coloured pixels appeared over the
+playfield and stayed at a fixed screen position while the map scrolled under
+them.
+
+They were tile data in the wrong plane. Each run was six bytes, and every second
+byte had a zero high nibble -- which is `tile_cells`' `{glyph, colour & 0x0F}`
+pairs -- and the runs sat exactly eighty bytes apart, which is `SCR_STRIDE`. So
+one `PLOT_TILE` call had written its three character rows into the bitmap plane
+instead of the character plane. The bitmap does not scroll, hence "locked to the
+screen", and nothing redraws it during play, hence "and stays there".
+
+The cause is that the VSYNC handler reaches C: `MUSIC_ROUTINE` calls the PSG
+driver. cc65 compiles every C function against twenty bytes of shared zero-page
+scratch -- the C stack pointer, `sreg`, `regsave`, `ptr1-4`, `tmp1-4` -- so an
+interrupt that calls C and does not put them back returns to whatever C function
+was running with its pointers and temporaries overwritten. `plot_tile` is C, and
+its `addr` is one of those temporaries. `zeropage.inc` names the amount for
+exactly this case: `zpsavespace`, "the amount of space that needs to be saved by
+an interrupt handler that calls C code".
+
+The fix is not to write that save loop. cc65 already has it: `set_irq()` installs
+a C level handler and the runtime's `clevel_irq` wrapper saves and restores that
+zero page, switches to a separate C stack and preserves `jmpvec` around the call.
+So `src/game/irq.s` exports `_petscii_irq` returning `IRQ_HANDLED` /
+`IRQ_NOT_HANDLED` and `main()` installs it with `set_irq`, instead of declaring
+a bare `.interruptor`. A bare interruptor is only safe if it never reaches C.
+
+Measured: 18 bytes of the bitmap corrupted after ten steps as an `.interruptor`,
+zero after 160 steps through `set_irq`. `tests/emu/irq_zp.txt` walks twenty steps
+and checks the three addresses it used to land on.
+
 ### Two voices, not one
 
 The PET had a single voice, so a sound effect had to take the music's:

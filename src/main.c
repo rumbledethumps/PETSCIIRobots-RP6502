@@ -5,6 +5,7 @@
  * every robot behave exactly as they do on the X16 rather than approximately.
  */
 #include <fcntl.h>
+#include <6502.h>
 #include <rp6502.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -192,6 +193,10 @@ static void cycle_item(void)
     plat_display_item();
 }
 
+/* The interrupt's own C stack. It only has to hold the PSG driver's frame; a
+ * quarter of a page is generous and costs nothing that matters. */
+static unsigned char irq_stack[128];
+
 /* Wait for the next game tick, which the VSYNC interrupt raises. */
 static unsigned char last_frame;
 
@@ -345,8 +350,13 @@ int main(void)
      * everything it touches has to exist first. Writing the register sets the
      * enable mask and clears anything already triggered; src/game/irq.s reads
      * it to acknowledge, since reading returns the triggered bits and clears
-     * them. cc65's runtime owns the $FFFE vector and walks the interruptor
-     * chain. */
+     * them.
+     *
+     * set_irq rather than a bare .interruptor: the handler reaches C, and
+     * cc65's clevel_irq wrapper is what saves the C runtime's zero page,
+     * switches to the stack below, and puts both back afterwards. Doing that by
+     * hand is the same work with none of the maintenance. */
+    set_irq(petscii_irq, irq_stack, sizeof(irq_stack));
     RIA.irq = 0x80;
     clear_chars();
 

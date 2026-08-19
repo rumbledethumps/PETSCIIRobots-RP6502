@@ -26,8 +26,18 @@
 ; bytes at sixty hertz is nothing, and it keeps the main loop free to use both
 ; portals without knowing this exists.
 ;
-; cc65's runtime already owns $FFFE and walks a chain of interruptors, calling
-; each with carry clear; setting carry means handled and stops the chain.
+; This handler reaches C -- MUSIC_ROUTINE calls the PSG driver -- and cc65
+; compiles every C function against twenty bytes of shared zero-page scratch:
+; the C stack pointer, sreg, regsave, ptr1-4 and tmp1-4. An interrupt that calls
+; C without putting those back hands the interrupted function its own pointers
+; rewritten, and PLOT_TILE is C, so a tile would occasionally draw its three
+; rows into the bitmap plane instead of the character plane and sit there.
+;
+; cc65 already solves this. set_irq() installs a C level handler and the
+; runtime's clevel_irq wrapper saves and restores that zero page, switches to a
+; separate C stack and preserves jmpvec around the call. So this is registered
+; through set_irq rather than as a bare .interruptor, and returns A = 1 for
+; IRQ_HANDLED and 0 for IRQ_NOT_HANDLED, which is what a cc65 irq_handler is.
 
         .include "petscii.inc"
         .include "rp6502.inc"
@@ -35,14 +45,14 @@
 ; The character plane config, from src/xram.h. Kept in step by hand.
 XR_CFG_CHARS = $E0A0
 
-        .interruptor petscii_irq
+        .export _petscii_irq
 
         .segment "CODE"
 
-petscii_irq:
+_petscii_irq:
         lda     RIA_IRQ                 ; reading returns the triggered bits
         bmi     @vsync                  ; ...and clears them. bit 7 is VSYNC.
-        clc                             ; not ours
+        lda     #0                      ; IRQ_NOT_HANDLED
         rts
 
 @vsync:
@@ -62,7 +72,7 @@ petscii_irq:
 @clock:
         jsr     UPDATE_GAME_CLOCK
         jsr     VBLANK_VIDEO
-        sec                             ; handled; stop the chain
+        lda     #1                      ; IRQ_HANDLED
         rts
 
 ; Push the staged video register values out, inside vblank.

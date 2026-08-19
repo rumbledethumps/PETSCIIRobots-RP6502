@@ -157,6 +157,9 @@ void __fastcall__ PLAY_SOUND(unsigned char effect);
 void __fastcall__ START_MUSIC(unsigned char *pattern);
 void STOP_MUSIC(void);
 
+/* The VSYNC handler, installed with set_irq. See src/game/irq.s. */
+unsigned char petscii_irq(void);
+
 /* The game over box, eleven characters a row, and the two endings. */
 extern unsigned char GAMEOVER1[11], GAMEOVER2[11], GAMEOVER3[11];
 extern unsigned char WIN_MSG[8], LOS_MSG[9];
