@@ -1,0 +1,48 @@
+; C linkage for the ported game logic.
+;
+; cc65 prefixes C identifiers with an underscore. Rather than rename David
+; Murray's routines or carry two labels on each of them, the aliases live here,
+; so every file in src/game/ stays a straight reading of the original and this
+; is the only place that knows C is involved.
+
+        .include "petscii.inc"
+
+        .exportzp _TILE, _MAP_X, _MAP_Y, _UNIT, _MOVE_TYPE
+        .exportzp _MOVE_RESULT, _UNIT_FIND, _RANDOM
+_TILE           := TILE
+_MAP_X          := MAP_X
+_MAP_Y          := MAP_Y
+_UNIT           := UNIT
+_MOVE_TYPE      := MOVE_TYPE
+_MOVE_RESULT    := MOVE_RESULT
+_UNIT_FIND      := UNIT_FIND
+_RANDOM         := RANDOM
+
+        .export _UNIT_TYPE, _UNIT_LOC_X, _UNIT_LOC_Y
+        .export _UNIT_A, _UNIT_B, _UNIT_C, _UNIT_D, _UNIT_HEALTH, _MAP
+_UNIT_TYPE      := UNIT_TYPE
+_UNIT_LOC_X     := UNIT_LOC_X
+_UNIT_LOC_Y     := UNIT_LOC_Y
+_UNIT_A         := UNIT_A
+_UNIT_B         := UNIT_B
+_UNIT_C         := UNIT_C
+_UNIT_D         := UNIT_D
+_UNIT_HEALTH    := UNIT_HEALTH
+_MAP            := MAP
+
+        .export _DESTRUCT_PATH, _TILE_ATTRIB
+_DESTRUCT_PATH  := DESTRUCT_PATH
+_TILE_ATTRIB    := TILE_ATTRIB
+
+        .export _GET_TILE_FROM_MAP, _PLOT_TILE_TO_MAP, _CHECK_FOR_UNIT
+        .export _REQUEST_WALK_UP, _REQUEST_WALK_DOWN
+        .export _REQUEST_WALK_LEFT, _REQUEST_WALK_RIGHT
+        .export _GENERATE_RANDOM_NUMBER
+_GET_TILE_FROM_MAP     := GET_TILE_FROM_MAP
+_PLOT_TILE_TO_MAP      := PLOT_TILE_TO_MAP
+_CHECK_FOR_UNIT        := CHECK_FOR_UNIT
+_REQUEST_WALK_UP       := REQUEST_WALK_UP
+_REQUEST_WALK_DOWN     := REQUEST_WALK_DOWN
+_REQUEST_WALK_LEFT     := REQUEST_WALK_LEFT
+_REQUEST_WALK_RIGHT    := REQUEST_WALK_RIGHT
+_GENERATE_RANDOM_NUMBER := GENERATE_RANDOM_NUMBER

@@ -26,6 +26,7 @@
 #define XR_CFG_CHARS    0xE0A0u   /*    16  vga_mode1_config_t (even address) */
 #define XR_KEYBOARD     0xE0B0u   /*    32  HID keycode bit array             */
 #define XR_GAMEPAD      0xE0D0u   /*    40  4 pads x 10 bytes                 */
+#define XR_PROBE        0xFE00u   /*    16  test ABI; see docs/test-abi.md    */
 #define XR_PSG          0xFF00u   /*    64  8 oscillators; even, no page cross*/
 
 /* Screen geometry. The character plane is 40 wide rather than something wider
@@ -47,5 +48,35 @@
 
 #define MAP_W           128
 #define MAP_H           64
+
+/* Sprites. Mode 5 draws a later index on top of an earlier one, the reverse of
+ * VERA's priority, so this order is the X16's sprite numbering reversed. All
+ * six are 32x32 4bpp, which is why one xreg_vga_mode(5, ...) call covers them:
+ * mode 5 has no non-square size, so the X16's two 64x32 HUD icons are four
+ * 32x32 sprites here. */
+#define SPR_PLAYER      0   /* was VERA sprite 3 */
+#define SPR_CURSOR      1   /* was VERA sprite 2 */
+#define SPR_ITEM_L      2   /* was VERA sprite 1, left half  */
+#define SPR_ITEM_R      3   /*                    right half */
+#define SPR_WEAPON_L    4   /* was VERA sprite 0, left half  */
+#define SPR_WEAPON_R    5
+#define SPR_COUNT       6
+#define SPR_FRAME_BYTES 512 /* 32 rows x 16 bytes at 4bpp */
+
+/* Off-screen parks a sprite; mode 5 has no enable bit. */
+#define SPR_PARKED_Y    240
+
+/* The player never moves on screen: the window follows him. These are the X16's
+ * own coordinates for sprite 3, from SPRITE_ATTRIB. */
+#define PLAYER_SPR_X    122
+#define PLAYER_SPR_Y    89
+
+/* PLAYER_DIRECTION values, as the X16 uses them: the frame index into
+ * spr_player.bin is direction + animate, and animate cycles 0..2. */
+#define FACE_UP     0
+#define FACE_DOWN   3
+#define FACE_LEFT   6
+#define FACE_RIGHT  9
+#define FACE_DEAD  12
 
 #endif

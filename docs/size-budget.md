@@ -146,3 +146,18 @@ cell address arithmetic and the portal writes are all verified on the machine
 rather than by eye. It also peeks `XR_FONT + 1` for `$7E`, which confirms the
 font really is stored row-major as mode 1 reads it — the failure that would
 otherwise show up as the VGA quietly substituting its built-in code page.
+
+## M3 — movement and collision
+
+`src/game/` in ca65 plus the C platform layer, built with cc65.
+
+| segment | bytes |
+|---|---|
+| `CODE` | 5,746 |
+| `RODATA` + `DATA` | 411 |
+| `BSS` | 5,202 |
+| `LEVELDATA` | 8,704 |
+| **RAM used, `$0200–$50FF`** | **20,735** of 64,768 — **44 KB free** |
+
+The 6502 routines themselves are small: `map.s`, `move.s` and `rng.s` together
+are about 300 bytes. Most of `CODE` is still the C platform layer.

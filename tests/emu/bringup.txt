@@ -48,8 +48,14 @@ peek xram:$E000 $20 $00
 peek xram:$E020 $00 $00
 peek xram:$E048 $20 $00
 
+# The probe block is the durable state assertion: a fixed XRAM address, so it
+# does not move when the linker rearranges RAM. 'P','R', playing, level a,
+# player at 22,38, and the window centred on him at 17,35.
+peek xram:$FE00 $50 $52 $02 $00 $16 $26
+peek xram:$FE0A $11 $23
+
 run 60
 
-# One golden frame. Regenerate with: tools/emu-crc.py tests/emu/bringup.txt
-expect-crc 59F9D3D4
+# One golden frame. Regenerate with: python3 tools/emu-crc.py tests/emu/bringup.txt
+expect-crc E0A5D57D
 shot "bringup.png"

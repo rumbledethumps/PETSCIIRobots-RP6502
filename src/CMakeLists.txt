@@ -1,7 +1,25 @@
 add_executable(robots)
-target_sources(robots PRIVATE main.c)
+target_sources(robots PRIVATE
+    main.c
+    # David Murray's game logic, converted from ACME to ca65. These are the
+    # original instructions, not a transliteration, so they behave exactly as
+    # the X16 build does.
+    game/globals.s
+    game/map.s
+    game/move.s
+    game/rng.s
+    game/capi.s
+)
 target_include_directories(robots PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 add_dependencies(robots petscii_assets)
+
+# GET_TILE_FROM_MAP builds the map address arithmetically rather than by
+# indexing, so MAP has to start on a page boundary. The stock rp6502.cfg has no
+# aligned segment, so the project ships one with LEVELDATA added.
+target_link_options(robots PRIVATE -C ${CMAKE_CURRENT_LIST_DIR}/rp6502-petscii.cfg)
+# ...and relink when it changes, which CMake does not infer from a link option.
+set_property(TARGET robots PROPERTY LINK_DEPENDS
+             ${CMAKE_CURRENT_LIST_DIR}/rp6502-petscii.cfg)
 
 # Static XRAM: loaded straight into place when the ROM loads, costing the 6502
 # nothing at run time. Addresses are the XRAM map in xram.h plus 0x10000.
