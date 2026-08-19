@@ -25,13 +25,15 @@ endif()
 # read it back. `poke` is newer than the emulator CI currently fetches, so the
 # tests that need it are registered only where it exists rather than failing
 # everywhere it does not. They light up on their own once CI catches up.
+#
+# Asked of the usage text rather than by running a script: at configure time the
+# ROM has not been built, and without one the emulator exits non-zero whatever
+# the script says, so a run cannot tell "no poke" from "no ROM".
 if(RP6502_EMU AND NOT DEFINED RP6502_EMU_HAS_POKE)
-    set(_probe ${CMAKE_CURRENT_BINARY_DIR}/poke-probe.txt)
-    file(WRITE ${_probe} "poke $0002 $00\n")
-    execute_process(COMMAND ${RP6502_EMU} --mute --seed 1 --tmpdrive
-                            --script ${_probe} ${PETSCII_ROM}
-                    RESULT_VARIABLE _rc OUTPUT_QUIET ERROR_QUIET)
-    if(_rc EQUAL 0)
+    execute_process(COMMAND ${RP6502_EMU} --help
+                    OUTPUT_VARIABLE _usage ERROR_VARIABLE _usage_err)
+    string(APPEND _usage "${_usage_err}")
+    if(_usage MATCHES "[\r\n]  poke ")
         set(RP6502_EMU_HAS_POKE ON CACHE INTERNAL "emulator supports poke")
         message(STATUS "rp6502-emu supports poke")
     else()
