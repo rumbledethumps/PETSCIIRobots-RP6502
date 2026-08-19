@@ -1,0 +1,161 @@
+# The intro menu's control option, which did nothing at all.
+#
+# CYCLE_CONTROLS steps CONTROL 0-1-2, clears KEYS_DEFINED, and writes the chosen
+# scheme over the intro screen's control line -- ten characters at row 5 from
+# column 4, which is the same place the menu draws the option's own label, so
+# the label is replaced by the answer. This port cycled the variable and drew
+# nothing, so the option looked broken and there was no way to tell the gamepad
+# had been selected.
+#
+# SET_CONTROLS then runs when START GAME is chosen: custom keys ask the player
+# for thirteen of them, anything else takes the defaults. That screen had never
+# been ported either, though SCR_CUSTOM_KEYS was sitting in the converted data.
+
+wait "MENU"
+run 30
+
+# Row 5 from column 4 is XR_CHARS + 5*80 + 4*2 = $9798, two bytes per cell. Only
+# the glyphs are checked, one at a time: the colour byte beside each is being
+# animated by the menu's flash, which walks a chart that starts at 0, so reading
+# a cell whole would depend on when the read landed.
+# at boot it is the menu's own label
+peek xram:$9798 $03
+peek xram:$979A $0F
+peek xram:$979C $0E
+peek xram:$979E $14
+peek xram:$97A0 $12
+peek xram:$97A2 $0F
+peek xram:$97A4 $0C
+peek xram:$97A6 $13
+
+# Down to the control option.
+press k
+run 6
+release k
+run 10
+press k
+run 6
+release k
+run 10
+press k
+run 6
+release k
+run 10
+
+# "custom key", then "snes pad", then back to "keyboard".
+press space
+run 6
+release space
+run 20
+# CONTROL 1
+peek xram:$9798 $03
+peek xram:$979A $15
+peek xram:$979C $13
+peek xram:$979E $14
+peek xram:$97A0 $0F
+peek xram:$97A2 $0D
+press space
+run 6
+release space
+run 20
+# CONTROL 2, the gamepad
+peek xram:$9798 $13
+peek xram:$979A $0E
+peek xram:$979C $05
+peek xram:$979E $13
+peek xram:$97A0 $20
+peek xram:$97A2 $10
+press space
+run 6
+release space
+run 20
+# back round to CONTROL 0
+peek xram:$9798 $0B
+peek xram:$979A $05
+peek xram:$979C $19
+peek xram:$979E $02
+peek xram:$97A0 $0F
+peek xram:$97A2 $01
+
+# Choose custom keys, then start: SET_CUSTOM_KEYS puts up SCR_CUSTOM_KEYS and
+# waits for thirteen keys, echoing each one back as the decimal code it will be
+# compared against.
+press space
+run 6
+release space
+run 20
+press i
+run 6
+release i
+run 10
+press i
+run 6
+release i
+run 10
+press i
+run 6
+release i
+run 10
+press space
+run 6
+release space
+run 40
+press i
+run 8
+release i
+run 8
+press k
+run 8
+release k
+run 8
+press j
+run 8
+release j
+run 8
+press l
+run 8
+release l
+run 8
+press w
+run 8
+release w
+run 8
+press s
+run 8
+release s
+run 8
+press a
+run 8
+release a
+run 8
+press d
+run 8
+release d
+run 8
+press 1
+run 8
+release 1
+run 8
+press 2
+run 8
+release 2
+run 8
+press 3
+run 8
+release 3
+run 8
+press 4
+run 8
+release 4
+run 8
+press 5
+run 8
+release 5
+run 8
+
+# Thirteen answers, in the order KEY_MOVE_UP lists them: move, fire, cycle,
+# use, search, push. These are the codes every CMP in the ported assembly will
+# now be against -- I K J L W S A D and then 1 to 5.
+wait "BRINGUP OK" 600
+run 20
+peek @KEY_MOVE_UP@ $49 $4B $4A $4C $57 $53 $41 $44 $31 $32 $33 $34 $35

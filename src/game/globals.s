@@ -167,6 +167,7 @@ PLAYER_ANIMATE:   .res 1        ; 0..2, added to PLAYER_DIRECTION for the frame
 
 ; ---- control scheme -----------------------------------------------------
 ; 0 keyboard, 1 custom keys, 2 gamepad. The X16 called the third one SNES.
+KEYS_DEFINED:   .res 1          ; 1 once the custom keys have been entered
 CONTROL:        .res 1
 
 ; ---- the intro menu -----------------------------------------------------

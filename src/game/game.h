@@ -131,7 +131,11 @@ extern unsigned char MENUY;             /* 0..3, which option is selected    */
 extern unsigned char MENUCOL;
 /* What the intro menu's third option cycles. 2 is the gamepad; the X16
  * tests CONTROL against 2 in five places. */
-#define CONTROL_GAMEPAD 2
+#define CONTROL_KEYBOARD 0
+#define CONTROL_CUSTOM   1
+#define CONTROL_GAMEPAD  2
+extern unsigned char CONTROLTEXT[], CONTROLSTART[];
+extern unsigned char KEYS_DEFINED;
 extern unsigned char SELECTED_MAP;      /* 0..13                             */
 extern unsigned char DIFF_LEVEL;        /* 0 easy, 1 normal, 2 hard          */
 extern unsigned char SPRITECOLSTATE, SPRITECOLTIMER;

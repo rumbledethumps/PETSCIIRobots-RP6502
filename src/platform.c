@@ -327,6 +327,45 @@ void plat_display_map_name(void)
 /* The intro robot's expression, three 16x10 images at 2bpp, one per difficulty.
  * It goes into the bitmap plane at 234,95 -- so 160 bytes a row, and 234/2 = 117
  * bytes in. */
+/* CCON2: the chosen scheme, written over the intro screen's control line --
+ * row 5 from column 4, ten characters. Without it the option looked broken:
+ * pressing it cycled CONTROL and changed nothing you could see, so there was no
+ * way to tell you had selected the gamepad. */
+void plat_display_control(void)
+{
+    put_glyphs(4, 5, CONTROLTEXT + CONTROLSTART[CONTROL], 10);
+}
+
+/* SET_CUSTOM_KEYS, from x16Robots.ASM 4767. Thirteen keys in the order
+ * KEY_MOVE_UP lists them, each echoed back as the decimal code it will be
+ * compared against, then KEYS_DEFINED so it is not asked again.
+ *
+ * The prompts are the screen SCR_CUSTOM_KEYS draws; the answers go down column
+ * 16 from row 8, which is where the original puts them.
+ */
+void plat_set_custom_keys(void)
+{
+    unsigned char i, key;
+
+    if (KEYS_DEFINED)
+        return;
+
+    plat_backdrop_visible(0);
+    plat_green_screen();
+    plat_decompress_screen(SCR_CUSTOM_KEYS, 0);
+
+    for (i = 0; i < 13; i++) {
+        do {
+            key = plat_getin();
+        } while (!key);
+        KEY_MOVE_UP[i] = key;
+        decwrite(16, (unsigned char)(8 + i), key);
+    }
+
+    KEYS_DEFINED = 1;
+    plat_backdrop_visible(1);
+}
+
 void plat_change_difficulty_level(void)
 {
     const unsigned char *p = THREE_FACES + (unsigned)DIFF_LEVEL * 80;

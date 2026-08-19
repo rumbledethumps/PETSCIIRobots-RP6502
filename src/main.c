@@ -370,6 +370,22 @@ static void wait_tick(void)
         printf("AI%u\n", frames_total);
 }
 
+/* SET_CONTROLS, from x16Robots.ASM 4737. Custom keys ask the player for
+ * thirteen of them; anything else takes the defaults. Called at boot and again
+ * when START GAME is chosen, which is where the original calls it -- so
+ * choosing custom keys and then starting is what brings the entry screen up. */
+static void set_controls(void)
+{
+    unsigned char i;
+
+    if (CONTROL == CONTROL_CUSTOM) {
+        plat_set_custom_keys();
+        return;
+    }
+    for (i = 0; i < 13; i++)
+        KEY_MOVE_UP[i] = STANDARD_CONTROLS[i];
+}
+
 /* The intro screen: pick a level, a difficulty and a control scheme, then
  * start. Four options at character rows 2 to 5; the selected one is flashed by
  * cycling its colour, which is all the X16 does with it too. */
@@ -416,6 +432,7 @@ static void intro_screen(void)
             plat_play_sound(SFX_BEEP);
             switch (MENUY) {
             case 0:
+                set_controls();         /* EXEC_COMMAND: before anything else */
                 return;                                         /* start */
             case 1:
                 if (++SELECTED_MAP == 14)
@@ -427,9 +444,11 @@ static void intro_screen(void)
                     DIFF_LEVEL = 0;
                 plat_change_difficulty_level();
                 break;
-            case 3:
+            case 3:                     /* CYCLE_CONTROLS */
+                KEYS_DEFINED = 0;       /* a new scheme is a new set of keys */
                 if (++CONTROL == 3)
                     CONTROL = 0;
+                plat_display_control();
                 break;
             }
         }
@@ -492,7 +511,7 @@ static void init_game(void)
 
 int main(void)
 {
-    unsigned char i, key;
+    unsigned char key;
 
     load_tileset();
 
@@ -521,9 +540,9 @@ int main(void)
     RIA.irq = 0x80;
     clear_chars();
 
-    for (i = 0; i < 13; i++)
-        KEY_MOVE_UP[i] = STANDARD_CONTROLS[i];
     CONTROL = 0;
+    KEYS_DEFINED = 0;
+    set_controls();                     /* copy initial key controls */
     DIFF_LEVEL = 1;
     SELECTED_MAP = 0;
     last_frame = IRQ_FRAME;

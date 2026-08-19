@@ -338,6 +338,33 @@ the map rather than drawn over it. Level-g starts with a robot already in view,
 so it reaches the path on the first frame -- and getting there drives the intro
 menu's map option, which nothing else did either.
 
+## The controls menu, which did nothing
+
+Reported alongside the gamepad: "controls menu also does nothing". Correct, and
+it is why the gamepad looked dead too -- there was no way to tell it had been
+selected.
+
+`CYCLE_CONTROLS` (x16Robots.ASM 4193) does three things: clears `KEYS_DEFINED`,
+steps `CONTROL` through 0, 1, 2, and writes the chosen scheme over the intro
+screen's control line -- ten characters at row 5 from column 4, which is where
+the menu draws that option's own label, so the label is replaced by the answer.
+This port did the middle one only. `CONTROLTEXT` ("keyboard  ", "custom key",
+"snes pad  ") had never been converted at all.
+
+`SET_CONTROLS` (4737) was missing its other half as well. It runs at boot and
+again when START GAME is chosen; custom keys send it to `SET_CUSTOM_KEYS`, which
+puts up `SCR_CUSTOM_KEYS` and asks for thirteen keys, echoing each back as the
+decimal code every `CMP` in the ported assembly will be compared against. The
+screen data was sitting in the converted screens with nothing reading it. This
+port copied `STANDARD_CONTROLS` unconditionally at boot and never called
+`SET_CONTROLS` again, so choosing custom keys did nothing.
+
+`tests/emu/controls.txt` cycles all three and checks the line each time, then
+chooses custom keys, starts, answers thirteen prompts and checks they landed in
+`KEY_MOVE_UP`. It asserts glyphs one at a time rather than whole cells: the
+colour byte beside each is animated by the menu's flash, which walks a chart
+starting at 0, so reading a cell whole would depend on when the read landed.
+
 ## Gamepads
 
 `plat_gamepad_read` was an empty function, so choosing CONTROLLER on the intro

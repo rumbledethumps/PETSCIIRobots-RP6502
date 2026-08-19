@@ -5,6 +5,8 @@
 void plat_draw_map_window(void);
 void plat_animate_water(void);
 void plat_key_repeat(void);
+void plat_display_control(void);
+void plat_set_custom_keys(void);
 void plat_gamepad_forget_dirs(void);
 unsigned char __fastcall__ pad_held(unsigned char button);
 void plat_flash_step(void);
