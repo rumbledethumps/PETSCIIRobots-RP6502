@@ -2,9 +2,16 @@
 # through MAP_TRANSLATION_TABLE, each row emitted twice so it fills 128x128
 # pixels under the blanked playfield.
 #
-# Leaving it restores the backdrop by reading the slice back out of the ROM
-# rather than blanking it, which costs the 6502 nothing and puts the real
-# artwork back instead of assuming it was black.
+# The assertions are on the pixels rather than a frame hash. The screen carries
+# blinking position markers, so a whole-canvas CRC depends on which half of the
+# blink the check lands in -- which is how an earlier version of this passed
+# here and failed in CI. Reading the map back out of the bitmap plane is exact
+# and says more: it proves the translation table, the row doubling and the
+# addressing all landed, tile by tile.
+#
+# Leaving restores the backdrop by reading the slice back out of the ROM rather
+# than blanking it, which costs the 6502 nothing and puts the real artwork back
+# instead of assuming it was black.
 
 wait "MENU"
 run 30
@@ -17,7 +24,24 @@ press tab
 run 6
 release tab
 run 60
-expect-crc D38557F0
+
+# Four corners of level-a, at bitmap offset (36 + 2*y) * 160 + x.
+# map(0,0) is tile 211, map(64,20) tile 9, map(10,50) tile 213, map(100,60) 210.
+peek xram:$1680 $DD
+peek xram:$2FC0 $66
+peek xram:$550A $FF
+peek xram:$61E4 $55
+
+# The player marker blinks on and off at the player's map position, which is
+# bitmap offset (36 + 2*38) * 160 + 22. Reading the byte is exact where a canvas
+# hash is not: the blink is a single pixel pair on a 320x240 screen, and two
+# samples a fixed distance apart can easily land on the same phase, which is how
+# an earlier version of this test failed.
+run 20
+peek xram:$4616 $11
+run 20
+peek xram:$4616 $00
+
 shot "livemap.png"
 
 # Any other key returns to the game, and the window is redrawn.

@@ -412,8 +412,11 @@ static void draw_live_map(void)
 /* A unit's position as two pixels on the live map, doubled the same way. */
 static void plot_map_dot(unsigned char slot, unsigned char color)
 {
+    /* One map byte is one bitmap byte -- two pixels of the same colour -- so
+     * the column is the map X, not half of it. The row is doubled to match the
+     * doubled draw. */
     unsigned addr = (unsigned)(LIVEMAP_TOP + UNIT_LOC_Y[slot] * 2) * 160u
-                  + (UNIT_LOC_X[slot] >> 1);
+                  + UNIT_LOC_X[slot];
     RIA.step0 = 1;
     RIA.addr0 = addr;
     RIA.rw0 = color;
