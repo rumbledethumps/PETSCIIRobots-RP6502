@@ -1,184 +1,83 @@
 # Dying, and the screens that follow.
 #
-# plat_game_over has two branches and only one of them had ever run under test.
-# On a death it faces the player's sprite FACE_DEAD, holds for 100 frames while
-# BACKGROUND_TASKS keeps running, then shows the box, the endgame statistics and
-# LOS_MSG; on a win it skips straight to the box. tests/emu/endgame.txt covers
-# the win.
+# plat_game_over has two branches and only the win one had ever been tested. On
+# a death it faces the sprite FACE_DEAD, holds while the world keeps running,
+# then shows the box, the endgame statistics and LOS_MSG. tests/emu/endgame.txt
+# covers the win.
 #
-# Getting killed is harder than it sounds. The hazards a route can reach stop
-# well short: level-e's rollerbot takes twelve health down to one and loses
-# interest. level-k has an evilbot at 9,5, three squares from the player's
-# start, and poking health down to 1 first makes the first hit fatal -- the game
-# still kills him through its own INFLICT_DAMAGE, which is the path worth
-# exercising.
+# Three faults were reported here and all three came from one line: this port
+# called BACKGROUND_TASKS inside the waits. The original runs it in GOM0 only --
+# while the body is on screen and whatever killed him is still moving, which is
+# the point -- and nowhere after the box goes up. Running it later left a robot
+# attacking the corpse behind the GAME OVER box and, because BACKGROUND_TASKS
+# redraws the map window whenever REDRAW_WINDOW is set, drew the playfield back
+# over the statistics.
 #
-# The route was recorded by
-#     tools/playthrough.py k 9 5 --keys --poke "@KEYS@ $07" --poke "@UNIT_HEALTH@ $01"
+# The player is killed by writing his unit type, which is what the AI does at
+# the end of INFLICT_DAMAGE. Taking real damage is covered by
+# tests/emu/flash.txt, which is driven by a hazard hitting the player; what
+# needs testing here is what happens afterwards, and a route that walks into a
+# robot cannot test it -- the probe is not refreshed while plat_game_over runs,
+# so a recorded route keeps walking and its keypresses dismiss the very screens
+# under test. See the note in tools/playthrough.py.
+#
 # @SYMBOL@ is a RAM address resolved from the linker map when the tests are
-# generated, because RAM symbols move whenever the code above them changes
-# size. XRAM addresses stay literal -- the program picks those, in src/xram.h.
-#
-# The keys are poked because level-k's route passes a locked door; without
-# them the driver walks around and never meets the evilbot.
+# generated. XRAM addresses stay literal -- the program picks those.
+
 wait "MENU"
 run 30
-press k
-run 6
-release k
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press space
-run 6
-release space
-run 10
-press i
-run 6
-release i
-run 10
 press space
 run 6
 release space
 wait "BRINGUP OK"
-run 20
-poke @KEYS@ $07
-poke @UNIT_HEALTH@ $01
 run 60
-press j
-run 8
-release j
-run 8
-press j
-run 8
-release j
-run 8
-press j
-run 8
-release j
-run 8
-press k
-run 8
-release k
-run 8
-press k
-run 8
-release k
-run 8
-press k
-run 8
-release k
-run 8
-press j
-run 8
-release j
-run 8
-press j
-run 8
-release j
-run 8
-press j
-run 8
-release j
-run 8
-press j
-run 8
-release j
-run 8
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
-run 60
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
-run 60
-press i
-run 8
-release i
-run 8
-press i
-run 8
-release i
-run 8
 
-# Killed: the AI signals it by putting the player's own unit type back to 0,
-# which the probe reports as state 3. A win would be 4.
-run 250
+poke @UNIT_TYPE@ $00
+run 60
+
+# GOM0: the body is on screen and the world is still moving, so this is still
+# the playfield rather than the box.
 peek xram:$FE02 $03
 
-# Then the death pose and its wait, the game-over box, the statistics, and back
-# to the intro. Reaching the menu is the assertion that all of it ran; each of
-# those screens waits for a key, so a hang in any of them times out here.
+# GOM2: the box. Three rows at column 11 of rows 9 to 11; row 10 is the words.
+run 120
+peek xram:$9936 $5D $01 $07 $01 $01 $01 $0D $01 $05 $01 $20 $01 $0F $01 $16 $01 $05 $01 $12 $01 $5D $01
+
+# And it stays. Five seconds with nothing pressed: the wait has to be a wait,
+# not something the next thing to happen scrolls past.
+run 300
+peek xram:$9936 $5D $01 $07 $01 $01 $01 $0D $01 $05 $01 $20 $01 $0F $01 $16 $01 $05 $01 $12 $01 $5D $01
+
+# One key, and the statistics. "you lose!" at row 3 from column 16.
 press space
 run 8
 release space
-run 150
+run 120
+peek xram:$9710 $19
+peek xram:$9712 $0F
+peek xram:$9714 $15
+peek xram:$9716 $20
+peek xram:$9718 $0C
+peek xram:$971A $0F
+peek xram:$971C $13
+peek xram:$971E $05
+peek xram:$9720 $21
+
+# Which also stays, rather than flashing past on the same keypress that got
+# here -- GOM5 drains what is waiting before it waits for something new.
+run 300
+peek xram:$9710 $19
+peek xram:$9712 $0F
+peek xram:$9714 $15
+peek xram:$9716 $20
+peek xram:$9718 $0C
+peek xram:$971A $0F
+peek xram:$971C $13
+peek xram:$971E $05
+peek xram:$9720 $21
+
+# And the last key returns to the intro.
 press space
 run 8
 release space
-run 150
-press space
-run 8
-release space
-wait "MENU" 500
+wait "MENU" 400

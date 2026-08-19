@@ -181,10 +181,20 @@ unsigned char plat_getin_keys(void)
 
 void plat_clear_key_buffer(void)
 {
+    unsigned char i;
+
     /* Both ends at once, so the interrupt must not be part way through a scan. */
     __asm__("sei");
     q_head = q_tail = 0;
     __asm__("cli");
+
+    /* The gamepad's latches are part of the buffer now that plat_getin falls
+     * back to them: a press left sitting in one is a keystroke waiting to be
+     * read, and a routine that clears the buffer and then waits for input would
+     * be answered by it immediately. That is a game-over screen appearing and
+     * vanishing in the same frame. */
+    for (i = 0; i < 12; i++)
+        NEW_BUTTONS[i] = 0;
     /* CLEAR_KEY_BUFFER's tail. Emptying the buffer without this lets whatever
      * the player is still holding arrive immediately as a fresh press, which is
      * exactly what the routine is called to prevent. */

@@ -15,6 +15,13 @@ walkability, press one key, and look again. What it prints is the script that
 worked, which can then be replayed open loop -- the emulator is deterministic
 under --seed, so a recorded route stays valid until the game's timing changes.
 
+ONE LIMIT WORTH KNOWING. The probe block is refreshed from the main loop, and
+plat_game_over does not return to it until the player has pressed a key at each
+of its screens. A route that kills the player therefore keeps reading "alive"
+and keeps walking, and its keypresses are what dismiss the game-over box and
+the statistics -- so a recording made that way cannot be used to test those
+screens. tests/emu/gameover.txt writes the player's unit type instead.
+
 Walkability comes from TILE_ATTRIB, bit 0, which is the same bit REQUEST_WALK
 tests through MOVE_TYPE. An unlocked door square counts as passable because the
 door AI opens it when the player comes near; the frames that takes are what the

@@ -473,46 +473,64 @@ static void endgame_stats(void)
 void plat_game_over(void)
 {
     const unsigned char *msg;
-    unsigned char i, n, key;
+    unsigned char i, n;
 
     CLOCK_ACTIVE = 0;
+    STOP_MUSIC();
 
     if (!UNIT_TYPE[0]) {                /* died rather than won */
         PLAYER_DIRECTION = FACE_DEAD;
         PLAYER_ANIMATE = 0;
         plat_display_player_sprite();
         KEYTIMER = 100;
-        while (KEYTIMER)
-            BACKGROUND_TASKS();
     }
+
+    /* GOM0. The only wait the world keeps running through: the body is on
+     * screen and whatever killed him is still moving, which is the point. */
+    do {
+        BACKGROUND_TASKS();
+    } while (KEYTIMER);
+
     SCREEN_SHAKE = 0;
     game_over_box();
 
-    KEYTIMER = 100;                     /* ignore keys for a moment */
+    /* GOM2, and everything after it, runs BACKGROUND_TASKS nowhere. The AI
+     * stops the moment the box goes up. Calling it in these waits is what left
+     * a robot attacking the corpse behind the GAME OVER box, and then -- since
+     * BACKGROUND_TASKS redraws the map window whenever REDRAW_WINDOW is set --
+     * drawing the playfield back over the endgame statistics. */
+    KEYTIMER = 100;
     while (KEYTIMER)
-        BACKGROUND_TASKS();
+        ;
     plat_clear_key_buffer();
-    do {
-        BACKGROUND_TASKS();
-        key = plat_getin();
-    } while (!key);
+    while (!plat_getin())               /* GOM3 */
+        ;
 
-    /* The stats. Sprites go away with the playfield. */
+    /* GOM4: the statistics. Sprites go away with the playfield. */
+    plat_clear_key_buffer();
+    STOP_MUSIC();
     for (i = 0; i < SPR_COUNT; i++)
         park_sprite(i);
     plat_display_endgame_screen();
     endgame_stats();
 
+    /* DISPLAY_WIN_LOSE. The original starts a tune here rather than playing an
+     * effect, which is what the win and lose patterns in the recovered PET
+     * music are for. */
     msg = UNIT_TYPE[0] ? WIN_MSG : LOS_MSG;
     n = (unsigned char)(UNIT_TYPE[0] ? 8 : 9);
     put_glyphs(16, 3, msg, n);
-    plat_play_sound(UNIT_TYPE[0] ? SFX_FOUNDITEM : SFX_ERROR);
+    START_MUSIC(UNIT_TYPE[0] ? WIN_MUSIC : LOSE_MUSIC);
 
+    /* GOM5 drains whatever is already waiting before it waits for a fresh
+     * press. Without that the key that dismissed the box is still there and
+     * carries straight through, which is the statistics screen appearing and
+     * vanishing too fast to read. */
+    while (plat_getin())
+        ;
+    while (!plat_getin())
+        ;
     plat_clear_key_buffer();
-    do {
-        BACKGROUND_TASKS();
-        key = plat_getin();
-    } while (!key);
 }
 
 /* ---- the live map ----------------------------------------------------- */

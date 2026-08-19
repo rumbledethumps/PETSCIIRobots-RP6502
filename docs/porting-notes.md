@@ -338,6 +338,43 @@ the map rather than drawn over it. Level-g starts with a robot already in view,
 so it reaches the path on the first frame -- and getting there drives the intro
 menu's map option, which nothing else did either.
 
+## Game over ran the AI through its own screens
+
+Three faults reported together: "the robot keeps attacking my dead corpse", "the
+score screen flashes too fast to read", and "we end up on a map-like screen with
+the robot tea bagging my corpse". All three are one line.
+
+The original calls `BACKGROUND_TASKS` in `GOM0` only -- the pause while the body
+is on screen and whatever killed him is still moving, which is the point -- and
+nowhere after the box goes up. `GOM2`, `GOM3` and `GOM5` are bare waits. This
+port called it in all of them, so the AI kept running: a robot went on attacking
+the corpse behind the GAME OVER box, and because `BACKGROUND_TASKS` redraws the
+map window whenever `REDRAW_WINDOW` is set, the playfield was drawn back over
+the endgame statistics -- the map-like screen, with the robot still animating on
+it.
+
+Two more differences found while comparing: the original calls `STOP_MUSIC` on
+the way in, and `DISPLAY_WIN_LOSE` starts the win or lose *tune* rather than
+playing a sound effect, which is what the win and lose patterns in the recovered
+PET music are for. This port did neither. `GOM5` also drains whatever is already
+waiting before it waits for something new, which is what stops the keypress that
+dismissed the box carrying straight through the statistics.
+
+### The test was lying, which took longer to find than the bug
+
+The first attempt to test this used a recorded route that walks the player into
+an evilbot. It passed, and it was worthless: the probe block is refreshed from
+the main loop, and `plat_game_over` does not return there until a key has been
+pressed at each of its screens. So `tools/playthrough.py` kept reading "alive",
+kept walking, and the keypresses it recorded were what dismissed the box and the
+statistics. The recording contained the input that defeated the thing being
+recorded.
+
+`tests/emu/gameover.txt` writes the player's unit type instead -- which is what
+`INFLICT_DAMAGE` does at the end -- and then presses nothing for five seconds at
+each screen to prove the wait is a wait. Real damage is covered by
+`tests/emu/flash.txt`, which is driven by a hazard hitting the player.
+
 ## The gamepad is always live, and the menu has two schemes
 
 A deliberate change, and the reason for it is a design fault in the original:
